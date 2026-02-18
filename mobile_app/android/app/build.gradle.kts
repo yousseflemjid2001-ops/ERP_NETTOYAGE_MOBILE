@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nettoyageplus.agent"
-        minSdk = 21  // Required by geolocator, firebase, google_maps_flutter
+        minSdk = flutter.minSdkVersion  // Required by geolocator, firebase, google_maps_flutter
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
