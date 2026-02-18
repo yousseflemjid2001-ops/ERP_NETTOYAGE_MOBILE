@@ -60,9 +60,7 @@ class ApiService {
 
   Future<Map<String, String>> _getHeaders() async {
     final token = await getToken();
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -72,10 +70,7 @@ class ApiService {
   Future<dynamic> _get(String endpoint) async {
     final headers = await _getHeaders();
     final response = await http
-        .get(
-          Uri.parse('${ApiConfig.baseUrl}$endpoint'),
-          headers: headers,
-        )
+        .get(Uri.parse('${ApiConfig.baseUrl}$endpoint'), headers: headers)
         .timeout(ApiConfig.timeout);
 
     return _handleResponse(response);
@@ -176,10 +171,14 @@ class ApiService {
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
         .join('&');
 
-    final data = await _get('/interventions${queryString.isNotEmpty ? '?$queryString' : ''}');
+    final data = await _get(
+      '/interventions${queryString.isNotEmpty ? '?$queryString' : ''}',
+    );
 
     if (data is Map && data.containsKey('data')) {
-      return (data['data'] as List).map((e) => Intervention.fromJson(e)).toList();
+      return (data['data'] as List)
+          .map((e) => Intervention.fromJson(e))
+          .toList();
     }
     if (data is List) {
       return data.map((e) => Intervention.fromJson(e)).toList();
@@ -202,28 +201,34 @@ class ApiService {
     return Intervention.fromJson(data);
   }
 
-  Future<Intervention> checkIn(String id, double lat, double lng, {double? accuracy}) async {
-    final body = <String, dynamic>{
-      'latitude': lat,
-      'longitude': lng,
-    };
+  Future<Intervention> checkIn(
+    String id,
+    double lat,
+    double lng, {
+    double? accuracy,
+  }) async {
+    final body = <String, dynamic>{'latitude': lat, 'longitude': lng};
     if (accuracy != null) body['accuracy'] = accuracy;
     final data = await _post('/interventions/$id/checkin', body);
     return Intervention.fromJson(data);
   }
 
-  Future<Intervention> checkOut(String id, double lat, double lng, {double? accuracy}) async {
-    final body = <String, dynamic>{
-      'latitude': lat,
-      'longitude': lng,
-    };
+  Future<Intervention> checkOut(
+    String id,
+    double lat,
+    double lng, {
+    double? accuracy,
+  }) async {
+    final body = <String, dynamic>{'latitude': lat, 'longitude': lng};
     if (accuracy != null) body['accuracy'] = accuracy;
     final data = await _post('/interventions/$id/checkout', body);
     return Intervention.fromJson(data);
   }
 
   Future<Intervention> addPhoto(String id, String photoUrl) async {
-    final data = await _post('/interventions/$id/photos', {'photoUrl': photoUrl});
+    final data = await _post('/interventions/$id/photos', {
+      'photoUrl': photoUrl,
+    });
     return Intervention.fromJson(data);
   }
 
@@ -275,14 +280,19 @@ class ApiService {
     return DailySummary.fromJson(data);
   }
 
-  Future<List<Attendance>> getAttendanceHistory({String? startDate, String? endDate}) async {
+  Future<List<Attendance>> getAttendanceHistory({
+    String? startDate,
+    String? endDate,
+  }) async {
     final params = <String, String>{};
     if (startDate != null) params['startDate'] = startDate;
     if (endDate != null) params['endDate'] = endDate;
     final queryString = params.entries
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
         .join('&');
-    final data = await _get('/attendance/history${queryString.isNotEmpty ? '?$queryString' : ''}');
+    final data = await _get(
+      '/attendance/history${queryString.isNotEmpty ? '?$queryString' : ''}',
+    );
     if (data is List) {
       return data.map((e) => Attendance.fromJson(e)).toList();
     }
@@ -300,7 +310,9 @@ class ApiService {
     final queryString = params.entries
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
         .join('&');
-    final data = await _get('/absences${queryString.isNotEmpty ? '?$queryString' : ''}');
+    final data = await _get(
+      '/absences${queryString.isNotEmpty ? '?$queryString' : ''}',
+    );
     if (data is List) {
       return data.map((e) => Absence.fromJson(e)).toList();
     }
@@ -361,6 +373,13 @@ class ApiService {
 
   Future<Map<String, dynamic>> getUnreadCount() async {
     return await _get('/notifications/unread-count');
+  }
+
+  Future<void> registerFCMToken(String token) async {
+    await _post('/notifications/register-device', {
+      'token': token,
+      'platform': 'mobile',
+    });
   }
 }
 

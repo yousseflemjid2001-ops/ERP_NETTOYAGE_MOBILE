@@ -1,12 +1,14 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    // FCM requires the Google Services plugin
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.example.mobile_app"
+    namespace = "com.nettoyageplus.agent"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,21 +22,29 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.mobile_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        applicationId = "com.nettoyageplus.agent"
+        minSdk = 21  // Required by geolocator, firebase, google_maps_flutter
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Google Maps API key (replace with your real key from Google Cloud Console)
+        manifestPlaceholders["googleMapsApiKey"] = "YOUR_GOOGLE_MAPS_API_KEY"
     }
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+        debug {
+            manifestPlaceholders["googleMapsApiKey"] = "YOUR_GOOGLE_MAPS_API_KEY_DEBUG"
         }
     }
 }

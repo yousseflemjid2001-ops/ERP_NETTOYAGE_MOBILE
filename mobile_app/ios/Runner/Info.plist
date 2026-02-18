@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mobile App</string>
+	<string>Nettoyage Plus</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>mobile_app</string>
+	<string>Nettoyage Plus</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,5 +45,30 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Google Maps -->
+	<key>GMSApiKey</key>
+	<string>YOUR_GOOGLE_MAPS_API_KEY</string>
+
+	<!-- Permissions iOS -->
+	<key>NSCameraUsageDescription</key>
+	<string>Nettoyage Plus a besoin de la caméra pour prendre des photos des interventions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Nettoyage Plus a besoin d’accèder à vos photos pour joindre des justificatifs.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Nettoyage Plus utilise votre localisation pour enregistrer les check-ins GPS des interventions.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Nettoyage Plus peut utiliser votre localisation en arrière-plan pour le suivi des missions.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Nettoyage Plus utilise votre localisation pour enregistrer les check-ins GPS des interventions.</string>
+
+	<!-- Notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 </dict>
 </plist>
