@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'services/connectivity_service.dart';
@@ -18,16 +17,8 @@ import 'pages/profile/profile_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase pour les push notifications
-  // Ignore l'erreur si google-services.json n'est pas encore configuré
-  try {
-    await Firebase.initializeApp();
-    await NotificationService().initialize();
-  } catch (e) {
-    debugPrint(
-      'Firebase init skipped (google-services.json not configured): $e',
-    );
-  }
+  // Initialisation des notifications locales (sans Firebase)
+  await NotificationService().initialize();
 
   // Démarrage de la surveillance de connectivité
   ConnectivityService().startMonitoring();

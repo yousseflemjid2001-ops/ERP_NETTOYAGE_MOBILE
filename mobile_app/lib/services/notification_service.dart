@@ -2,22 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'api_service.dart';
 
-/// NotificationService — gère FCM (Firebase Cloud Messaging) + notifications locales.
-///
-/// Setup requis :
-///   1. Ajouter google-services.json dans android/app/
-///   2. Ajouter GoogleService-Info.plist dans ios/Runner/
-///   3. Appeler NotificationService().initialize() dans main()
-
-/// Handler de background messages (doit être top-level function)
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('FCM Background: ${message.messageId}');
-}
-
+/// NotificationService — gère les notifications locales (sans Firebase).
+/// Les notifications sont déclenchées depuis l'API NestJS/Supabase via polling.
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -25,8 +12,6 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
-  FirebaseMessaging? _messaging;
-  String? _fcmToken;
 
   final StreamController<Map<String, dynamic>> _notificationTapController =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -39,7 +24,6 @@ class NotificationService {
 
   Future<void> initialize() async {
     await _initLocalNotifications();
-    await _initFCM();
   }
 
   Future<void> _initLocalNotifications() async {
@@ -91,89 +75,6 @@ class NotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  Future<void> _initFCM() async {
-    try {
-      _messaging = FirebaseMessaging.instance;
-
-      // Demande de permission (iOS)
-      final settings = await _messaging!.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-
-      debugPrint('FCM Permission: ${settings.authorizationStatus}');
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-          settings.authorizationStatus == AuthorizationStatus.provisional) {
-        // Récupère le token FCM
-        _fcmToken = await _messaging!.getToken();
-        debugPrint('FCM Token: $_fcmToken');
-
-        // Envoie le token au backend
-        if (_fcmToken != null) {
-          await _registerTokenWithBackend(_fcmToken!);
-        }
-
-        // Renouvellement du token
-        _messaging!.onTokenRefresh.listen((newToken) {
-          _fcmToken = newToken;
-          _registerTokenWithBackend(newToken);
-        });
-
-        // Message reçu en foreground
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-        // Message tap depuis notification (app en background)
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
-
-        // App lancée depuis une notification
-        final initialMessage = await _messaging!.getInitialMessage();
-        if (initialMessage != null) {
-          _handleMessageTap(initialMessage);
-        }
-
-        // Handler background
-        FirebaseMessaging.onBackgroundMessage(
-          firebaseMessagingBackgroundHandler,
-        );
-      }
-    } catch (e) {
-      debugPrint('FCM init error (likely missing google-services.json): $e');
-    }
-  }
-
-  Future<void> _registerTokenWithBackend(String token) async {
-    try {
-      await ApiService().registerFCMToken(token);
-    } catch (e) {
-      debugPrint('Failed to register FCM token with backend: $e');
-    }
-  }
-
-  // ============================================
-  // TRAITEMENT DES MESSAGES FCM
-  // ============================================
-
-  void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('FCM Foreground: ${message.notification?.title}');
-    final notification = message.notification;
-    if (notification == null) return;
-
-    _showLocalNotification(
-      id: message.hashCode,
-      title: notification.title ?? 'Nettoyage Plus',
-      body: notification.body ?? '',
-      payload: jsonEncode(message.data),
-      type: message.data['type'] as String? ?? 'default',
-    );
-  }
-
-  void _handleMessageTap(RemoteMessage message) {
-    _notificationTapController.add(message.data);
-  }
-
   // ============================================
   // NOTIFICATIONS LOCALES
   // ============================================
@@ -183,7 +84,6 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
-    String type = 'default',
   }) async {
     final androidDetails = AndroidNotificationDetails(
       'nettoyage_plus_default',
@@ -209,7 +109,7 @@ class NotificationService {
     await _localNotifications.show(id, title, body, details, payload: payload);
   }
 
-  /// Affiche une notification locale immédiate (sans FCM).
+  /// Affiche une notification locale immédiate.
   Future<void> showNotification({
     required String title,
     required String body,
@@ -240,8 +140,6 @@ class NotificationService {
       data: {'type': 'mission_reminder'},
     );
   }
-
-  String? get fcmToken => _fcmToken;
 
   void dispose() {
     _notificationTapController.close();
