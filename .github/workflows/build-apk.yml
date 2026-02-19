@@ -41,13 +41,6 @@ jobs:
           mkdir -p artifacts
           cp mobile_app/build/app/outputs/flutter-apk/app-release.apk artifacts/NettoyagePlus-Agent.apk
 
-      - name: Upload APK as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NettoyagePlus-Agent-APK
-          path: artifacts/NettoyagePlus-Agent.apk
-          retention-days: 90
-
       - name: Create Release (on main/master push)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: ncipollo/release-action@v1
