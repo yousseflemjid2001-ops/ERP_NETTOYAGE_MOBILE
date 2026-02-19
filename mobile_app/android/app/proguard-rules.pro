@@ -23,3 +23,10 @@
 
 # Keep model classes
 -keep class com.nettoyageplus.agent.** { *; }
+
+# Google Play Core (required by Flutter's deferred components)
+-keep class com.google.android.play.core.** { *; }
+-keep interface com.google.android.play.core.** { *; }
+-keep class com.google.android.play.core.splitcompat.SplitCompatApplication { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
