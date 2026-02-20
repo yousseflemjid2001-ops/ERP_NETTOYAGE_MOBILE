@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -11,20 +12,52 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => ProfilePageState();
 }
 
-class ProfilePageState extends State<ProfilePage> {
+class ProfilePageState extends State<ProfilePage>
+    with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   Map<String, dynamic>? _profile;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadProfile();
+    // Auto-refresh every 60 seconds
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _silentRefresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _silentRefresh();
+    }
   }
 
   /// Called externally when user switches to this tab.
   void refresh() {
     _loadProfile();
+  }
+
+  /// Silent refresh without showing loading spinner.
+  Future<void> _silentRefresh() async {
+    try {
+      final profile = await _api.getProfile();
+      if (mounted) {
+        setState(() => _profile = profile);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {

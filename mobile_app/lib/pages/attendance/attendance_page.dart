@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../models/attendance.dart';
@@ -10,23 +11,61 @@ class AttendancePage extends StatefulWidget {
   State<AttendancePage> createState() => AttendancePageState();
 }
 
-class AttendancePageState extends State<AttendancePage> {
+class AttendancePageState extends State<AttendancePage>
+    with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   bool _actionLoading = false;
   ShiftStatus? _shiftStatus;
   DailySummary? _dailySummary;
   List<Attendance> _history = [];
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    // Auto-refresh every 15 seconds to keep shift status up to date
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _silentRefresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _silentRefresh();
+    }
   }
 
   /// Called externally when user switches to this tab.
   void refresh() {
     _loadData();
+  }
+
+  /// Silent refresh without showing loading spinner (used by timer).
+  Future<void> _silentRefresh() async {
+    try {
+      final status = await _api.getShiftStatus();
+      final summary = await _api.getDailySummary();
+      final history = await _api.getAttendanceHistory();
+      if (mounted) {
+        setState(() {
+          _shiftStatus = status;
+          _dailySummary = summary;
+          _history = history;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {

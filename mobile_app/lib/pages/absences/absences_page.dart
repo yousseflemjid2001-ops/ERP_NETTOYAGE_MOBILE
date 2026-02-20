@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -12,21 +13,63 @@ class AbsencesPage extends StatefulWidget {
   State<AbsencesPage> createState() => AbsencesPageState();
 }
 
-class AbsencesPageState extends State<AbsencesPage> {
+class AbsencesPageState extends State<AbsencesPage>
+    with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   List<Absence> _absences = [];
   AbsenceBalance? _balance;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    // Auto-refresh every 30 seconds
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _silentRefresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _silentRefresh();
+    }
   }
 
   /// Called externally when user switches to this tab.
   void refresh() {
     _loadData();
+  }
+
+  /// Silent refresh without showing loading spinner (used by timer).
+  Future<void> _silentRefresh() async {
+    final user = context.read<AuthProvider>().user;
+    try {
+      final absences = await _api.getMyAbsences(agentId: user?.id);
+      AbsenceBalance? balance;
+      if (user != null) {
+        try {
+          balance = await _api.getAbsenceBalance(user.id);
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _absences = absences;
+          if (balance != null) _balance = balance;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {

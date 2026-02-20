@@ -39,10 +39,10 @@ class MissionsPageState extends State<MissionsPage>
       }
     });
     _loadMissions();
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (silent — no loading spinner)
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: 30),
-      (_) => _loadMissions(),
+      (_) => _silentRefresh(),
     );
   }
 
@@ -57,8 +57,46 @@ class MissionsPageState extends State<MissionsPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadMissions();
+      _silentRefresh();
     }
+  }
+
+  /// Silent refresh without showing loading spinner (used by timer).
+  Future<void> _silentRefresh() async {
+    final user = context.read<AuthProvider>().user;
+    try {
+      final now = DateTime.now();
+      String? dateFrom;
+      String? dateTo;
+      switch (_tabController.index) {
+        case 0:
+          dateFrom = _formatDate(now);
+          dateTo = _formatDate(now);
+          break;
+        case 1:
+          final tomorrow = now.add(const Duration(days: 1));
+          dateFrom = _formatDate(tomorrow);
+          dateTo = _formatDate(tomorrow);
+          break;
+        case 2:
+          dateFrom = _formatDate(now);
+          final endOfWeek = now.add(Duration(days: 7 - now.weekday));
+          dateTo = _formatDate(endOfWeek);
+          break;
+        case 3:
+          break;
+      }
+      final missions = await _api.getMyMissions(
+        agentId: user?.id,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        sortBy: 'scheduledDate',
+        sortOrder: 'ASC',
+      );
+      if (mounted) {
+        setState(() => _missions = missions);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadMissions() async {
