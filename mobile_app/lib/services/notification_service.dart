@@ -54,8 +54,11 @@ class NotificationService {
       },
     );
 
-    // Créer le canal Android par défaut
+    // Créer les canaux Android
     await _createAndroidChannel();
+
+    // Demander la permission POST_NOTIFICATIONS (Android 13+ / API 33+)
+    await _requestAndroidPermission();
   }
 
   Future<void> _createAndroidChannel() async {
@@ -83,6 +86,27 @@ class NotificationService {
         >();
     await android?.createNotificationChannel(defaultChannel);
     await android?.createNotificationChannel(missionChannel);
+  }
+
+  /// Demande la permission POST_NOTIFICATIONS sur Android 13+ (API 33+).
+  Future<void> _requestAndroidPermission() async {
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android != null) {
+      final granted = await android.requestNotificationsPermission();
+      debugPrint('[Notifications] Permission accordée: $granted');
+    }
+  }
+
+  /// Expose la méthode pour re-demander la permission depuis l'UI.
+  Future<bool?> requestPermission() async {
+    final android = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    return android?.requestNotificationsPermission();
   }
 
   // ============================================

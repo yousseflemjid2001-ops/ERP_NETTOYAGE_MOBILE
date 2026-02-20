@@ -16,6 +16,7 @@ import 'pages/absences/absences_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'pages/messages/conversations_page.dart';
 import 'services/mission_polling_service.dart';
+import 'pages/notifications/notifications_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +77,11 @@ class MyApp extends StatelessWidget {
                 final missionId = settings.arguments as String;
                 return MaterialPageRoute(
                   builder: (_) => MissionDetailPage(missionId: missionId),
+                );
+              }
+              if (settings.name == '/notifications') {
+                return MaterialPageRoute(
+                  builder: (_) => const NotificationsPage(),
                 );
               }
               return null;

@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../models/intervention.dart';
 import '../../models/attendance.dart';
 import '../../config/theme.dart';
+import '../notifications/notifications_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -22,6 +23,7 @@ class DashboardPageState extends State<DashboardPage>
   List<Intervention> _todayMissions = [];
   int _pendingMissions = 0;
   int _completedMissions = 0;
+  int _unreadNotifications = 0;
   Timer? _autoRefreshTimer;
 
   @override
@@ -63,6 +65,14 @@ class DashboardPageState extends State<DashboardPage>
         setState(() => _shiftStatus = newStatus);
       }
     } catch (_) {}
+    // Also refresh unread notifications count
+    try {
+      final countData = await _api.getUnreadCount();
+      final count = countData['count'] as int? ?? 0;
+      if (mounted && count != _unreadNotifications) {
+        setState(() => _unreadNotifications = count);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -73,6 +83,12 @@ class DashboardPageState extends State<DashboardPage>
       // Load shift status
       try {
         _shiftStatus = await _api.getShiftStatus();
+      } catch (_) {}
+
+      // Load unread notifications count
+      try {
+        final countData = await _api.getUnreadCount();
+        _unreadNotifications = countData['count'] as int? ?? 0;
       } catch (_) {}
 
       // Load today's missions
@@ -184,12 +200,54 @@ class DashboardPageState extends State<DashboardPage>
                                   ),
                                 ],
                               ),
-                              IconButton(
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: Colors.white,
-                                ),
+                              Stack(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const NotificationsPage(),
+                                        ),
+                                      ).then((_) {
+                                        // Refresh count after returning
+                                        _refreshShiftStatus();
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.notifications_outlined,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  if (_unreadNotifications > 0)
+                                    Positioned(
+                                      right: 6,
+                                      top: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 16,
+                                          minHeight: 16,
+                                        ),
+                                        child: Text(
+                                          _unreadNotifications > 99
+                                              ? '99+'
+                                              : '$_unreadNotifications',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
