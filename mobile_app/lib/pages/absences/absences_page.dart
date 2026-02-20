@@ -9,10 +9,10 @@ class AbsencesPage extends StatefulWidget {
   const AbsencesPage({super.key});
 
   @override
-  State<AbsencesPage> createState() => _AbsencesPageState();
+  State<AbsencesPage> createState() => AbsencesPageState();
 }
 
-class _AbsencesPageState extends State<AbsencesPage> {
+class AbsencesPageState extends State<AbsencesPage> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   List<Absence> _absences = [];
@@ -21,6 +21,11 @@ class _AbsencesPageState extends State<AbsencesPage> {
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  /// Called externally when user switches to this tab.
+  void refresh() {
     _loadData();
   }
 

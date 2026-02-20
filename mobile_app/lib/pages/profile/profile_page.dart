@@ -8,10 +8,10 @@ class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfilePage> createState() => ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class ProfilePageState extends State<ProfilePage> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   Map<String, dynamic>? _profile;
@@ -19,6 +19,11 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _loadProfile();
+  }
+
+  /// Called externally when user switches to this tab.
+  void refresh() {
     _loadProfile();
   }
 

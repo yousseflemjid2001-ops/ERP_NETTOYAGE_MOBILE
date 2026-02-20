@@ -147,14 +147,18 @@ class _MainNavigationState extends State<MainNavigation> {
   late final StreamSubscription _notificationSub;
 
   final GlobalKey<DashboardPageState> _dashboardKey = GlobalKey();
+  final GlobalKey<MissionsPageState> _missionsKey = GlobalKey();
+  final GlobalKey<AttendancePageState> _attendanceKey = GlobalKey();
+  final GlobalKey<AbsencesPageState> _absencesKey = GlobalKey();
+  final GlobalKey<ProfilePageState> _profileKey = GlobalKey();
 
   late final List<Widget> _pages = [
     DashboardPage(key: _dashboardKey),
-    const MissionsPage(),
-    const AttendancePage(),
+    MissionsPage(key: _missionsKey),
+    AttendancePage(key: _attendanceKey),
     const ConversationsPage(),
-    const AbsencesPage(),
-    const ProfilePage(),
+    AbsencesPage(key: _absencesKey),
+    ProfilePage(key: _profileKey),
   ];
 
   @override
@@ -185,9 +189,24 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _onTabTap(int index) {
     setState(() => _currentIndex = index);
-    // Refresh dashboard when switching back to it
-    if (index == 0) {
-      _dashboardKey.currentState?.refresh();
+    // Refresh the page data when switching tabs
+    switch (index) {
+      case 0:
+        _dashboardKey.currentState?.refresh();
+        break;
+      case 1:
+        _missionsKey.currentState?.refresh();
+        break;
+      case 2:
+        _attendanceKey.currentState?.refresh();
+        break;
+      // case 3: ConversationsPage already has its own polling
+      case 4:
+        _absencesKey.currentState?.refresh();
+        break;
+      case 5:
+        _profileKey.currentState?.refresh();
+        break;
     }
   }
 

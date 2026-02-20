@@ -30,6 +30,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
     try {
       final data = await _api.getNotifications();
       if (mounted) setState(() => _notifications = data);
+
+      // Mark all notifications as read when the page is opened
+      try {
+        await _api.markAllNotificationsAsRead();
+      } catch (_) {}
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }

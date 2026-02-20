@@ -7,10 +7,10 @@ class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
 
   @override
-  State<AttendancePage> createState() => _AttendancePageState();
+  State<AttendancePage> createState() => AttendancePageState();
 }
 
-class _AttendancePageState extends State<AttendancePage> {
+class AttendancePageState extends State<AttendancePage> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   bool _actionLoading = false;
@@ -21,6 +21,11 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  /// Called externally when user switches to this tab.
+  void refresh() {
     _loadData();
   }
 

@@ -10,10 +10,10 @@ class MissionsPage extends StatefulWidget {
   const MissionsPage({super.key});
 
   @override
-  State<MissionsPage> createState() => _MissionsPageState();
+  State<MissionsPage> createState() => MissionsPageState();
 }
 
-class _MissionsPageState extends State<MissionsPage>
+class MissionsPageState extends State<MissionsPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _api = ApiService();
   late TabController _tabController;
@@ -22,6 +22,11 @@ class _MissionsPageState extends State<MissionsPage>
   Timer? _autoRefreshTimer;
 
   final List<String> _tabs = ["Aujourd'hui", 'Demain', 'Semaine', 'Toutes'];
+
+  /// Called externally when user switches to this tab.
+  void refresh() {
+    _loadMissions();
+  }
 
   @override
   void initState() {

@@ -376,6 +376,14 @@ class ApiService {
     return await _get('/notifications/unread-count');
   }
 
+  Future<void> markAllNotificationsAsRead() async {
+    await _post('/notifications/mark-read', {});
+  }
+
+  Future<void> markNotificationAsRead(String id) async {
+    await _patch('/notifications/$id/read', {});
+  }
+
   Future<void> registerFCMToken(String token) async {
     await _post('/notifications/register-device', {
       'token': token,
