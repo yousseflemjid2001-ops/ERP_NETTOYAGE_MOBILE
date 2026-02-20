@@ -59,7 +59,7 @@ class NotificationService {
   }
 
   Future<void> _createAndroidChannel() async {
-    const channel = AndroidNotificationChannel(
+    const defaultChannel = AndroidNotificationChannel(
       'nettoyage_plus_default',
       'Nettoyage Plus',
       description: 'Notifications de l\'application Nettoyage Plus',
@@ -68,11 +68,21 @@ class NotificationService {
       playSound: true,
     );
 
-    await _localNotifications
+    const missionChannel = AndroidNotificationChannel(
+      'nettoyage_plus_missions',
+      'Missions',
+      description: 'Notifications de nouvelles missions et modifications',
+      importance: Importance.high,
+      enableVibration: true,
+      playSound: true,
+    );
+
+    final android = _localNotifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(channel);
+        >();
+    await android?.createNotificationChannel(defaultChannel);
+    await android?.createNotificationChannel(missionChannel);
   }
 
   // ============================================
@@ -138,6 +148,42 @@ class NotificationService {
       title: 'Rappel de mission',
       body: '$missionTitle à $time',
       data: {'type': 'mission_reminder'},
+    );
+  }
+
+  /// Notification spécifique aux missions (canal dédié).
+  Future<void> showMissionNotification({
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      'nettoyage_plus_missions',
+      'Missions',
+      channelDescription: 'Notifications de missions',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      color: const Color(0xFF2563EB),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      details,
+      payload: data != null ? jsonEncode(data) : null,
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -13,17 +14,19 @@ class MissionsPage extends StatefulWidget {
 }
 
 class _MissionsPageState extends State<MissionsPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _api = ApiService();
   late TabController _tabController;
   bool _isLoading = true;
   List<Intervention> _missions = [];
+  Timer? _autoRefreshTimer;
 
   final List<String> _tabs = ["Aujourd'hui", 'Demain', 'Semaine', 'Toutes'];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -31,12 +34,26 @@ class _MissionsPageState extends State<MissionsPage>
       }
     });
     _loadMissions();
+    // Auto-refresh every 30 seconds
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadMissions(),
+    );
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadMissions();
+    }
   }
 
   Future<void> _loadMissions() async {
@@ -76,9 +93,9 @@ class _MissionsPageState extends State<MissionsPage>
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erreur: ${e.toString()}')));
       }
     }
 
@@ -107,30 +124,32 @@ class _MissionsPageState extends State<MissionsPage>
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _missions.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.event_available,
-                            size: 64,
-                            color: AppTheme.textSecondary.withOpacity(0.3)),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Aucune mission',
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.event_available,
+                      size: 64,
+                      color: AppTheme.textSecondary.withOpacity(0.3),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _missions.length,
-                    itemBuilder: (context, index) =>
-                        _buildMissionCard(_missions[index]),
-                  ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Aucune mission',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _missions.length,
+                itemBuilder: (context, index) =>
+                    _buildMissionCard(_missions[index]),
+              ),
       ),
     );
   }
@@ -143,8 +162,11 @@ class _MissionsPageState extends State<MissionsPage>
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.pushNamed(context, '/mission-detail',
-              arguments: mission.id);
+          Navigator.pushNamed(
+            context,
+            '/mission-detail',
+            arguments: mission.id,
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -154,8 +176,10 @@ class _MissionsPageState extends State<MissionsPage>
               Row(
                 children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -192,8 +216,11 @@ class _MissionsPageState extends State<MissionsPage>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.business, size: 18,
-                        color: AppTheme.textSecondary),
+                    const Icon(
+                      Icons.business,
+                      size: 18,
+                      color: AppTheme.textSecondary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -210,24 +237,32 @@ class _MissionsPageState extends State<MissionsPage>
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 18,
-                      color: AppTheme.textSecondary),
+                  const Icon(
+                    Icons.access_time,
+                    size: 18,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     '${_formatTimeShort(mission.scheduledStartTime)} - ${_formatTimeShort(mission.scheduledEndTime)}',
                     style: const TextStyle(color: AppTheme.textSecondary),
                   ),
                   const Spacer(),
-                  const Icon(Icons.chevron_right,
-                      color: AppTheme.textSecondary),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppTheme.textSecondary,
+                  ),
                 ],
               ),
               if (mission.siteAddress != null) ...[
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 18,
-                        color: AppTheme.textSecondary),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 18,
+                      color: AppTheme.textSecondary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -273,8 +308,19 @@ class _MissionsPageState extends State<MissionsPage>
     try {
       final dt = DateTime.parse(date);
       final months = [
-        '', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-        'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc',
+        '',
+        'Jan',
+        'Fév',
+        'Mar',
+        'Avr',
+        'Mai',
+        'Juin',
+        'Juil',
+        'Aoû',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Déc',
       ];
       return '${dt.day} ${months[dt.month]}';
     } catch (_) {

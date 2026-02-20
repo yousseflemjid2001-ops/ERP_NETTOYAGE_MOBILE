@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
@@ -14,6 +15,7 @@ import 'pages/attendance/attendance_page.dart';
 import 'pages/absences/absences_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'pages/messages/conversations_page.dart';
+import 'services/mission_polling_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +55,13 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {
+          // Start/stop mission polling based on auth state
+          if (auth.isAuthenticated && !auth.isLoading) {
+            MissionPollingService().start();
+          } else {
+            MissionPollingService().stop();
+          }
+
           return MaterialApp(
             title: 'Nettoyage Plus - Agent',
             debugShowCheckedModeBanner: false,
@@ -129,15 +138,52 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  late final StreamSubscription _notificationSub;
 
-  final List<Widget> _pages = const [
-    DashboardPage(),
-    MissionsPage(),
-    AttendancePage(),
-    ConversationsPage(),
-    AbsencesPage(),
-    ProfilePage(),
+  final GlobalKey<DashboardPageState> _dashboardKey = GlobalKey();
+
+  late final List<Widget> _pages = [
+    DashboardPage(key: _dashboardKey),
+    const MissionsPage(),
+    const AttendancePage(),
+    const ConversationsPage(),
+    const AbsencesPage(),
+    const ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for notification taps to navigate to mission detail
+    _notificationSub = NotificationService().onNotificationTap.listen((data) {
+      final type = data['type'];
+      final missionId = data['missionId'];
+      if ((type == 'new_mission' ||
+              type == 'mission_updated' ||
+              type == 'mission_removed') &&
+          missionId != null) {
+        // Switch to missions tab
+        setState(() => _currentIndex = 1);
+        if (type != 'mission_removed') {
+          Navigator.pushNamed(context, '/mission-detail', arguments: missionId);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationSub.cancel();
+    super.dispose();
+  }
+
+  void _onTabTap(int index) {
+    setState(() => _currentIndex = index);
+    // Refresh dashboard when switching back to it
+    if (index == 0) {
+      _dashboardKey.currentState?.refresh();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +239,7 @@ class _MainNavigationState extends State<MainNavigation> {
             ),
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
+              onTap: _onTabTap,
               type: BottomNavigationBarType.fixed,
               selectedFontSize: 12,
               unselectedFontSize: 11,

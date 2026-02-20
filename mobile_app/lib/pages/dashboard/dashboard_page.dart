@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -10,21 +11,58 @@ class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<DashboardPage> createState() => DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class DashboardPageState extends State<DashboardPage>
+    with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   ShiftStatus? _shiftStatus;
   List<Intervention> _todayMissions = [];
   int _pendingMissions = 0;
   int _completedMissions = 0;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    // Auto-refresh every 15 seconds to pick up clock-in/out changes
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _refreshShiftStatus(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadData();
+    }
+  }
+
+  /// Called from MainNavigation when user switches to the dashboard tab.
+  void refresh() {
+    _loadData();
+  }
+
+  /// Lightweight refresh: only shift status (called by timer).
+  Future<void> _refreshShiftStatus() async {
+    try {
+      final newStatus = await _api.getShiftStatus();
+      if (mounted && (newStatus.isOnShift != _shiftStatus?.isOnShift)) {
+        setState(() => _shiftStatus = newStatus);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -53,9 +91,11 @@ class _DashboardPageState extends State<DashboardPage> {
       try {
         final allMissions = await _api.getMyMissions(agentId: user?.id);
         _pendingMissions = allMissions
-            .where((m) =>
-                m.status == InterventionStatus.scheduled ||
-                m.status == InterventionStatus.inProgress)
+            .where(
+              (m) =>
+                  m.status == InterventionStatus.scheduled ||
+                  m.status == InterventionStatus.inProgress,
+            )
             .length;
         _completedMissions = allMissions
             .where((m) => m.status == InterventionStatus.completed)
@@ -93,7 +133,11 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                       ),
                       padding: EdgeInsets.fromLTRB(
-                          20, MediaQuery.of(context).padding.top + 16, 20, 24),
+                        20,
+                        MediaQuery.of(context).padding.top + 16,
+                        20,
+                        24,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -104,7 +148,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                 children: [
                                   CircleAvatar(
                                     radius: 24,
-                                    backgroundColor: Colors.white.withOpacity(0.2),
+                                    backgroundColor: Colors.white.withOpacity(
+                                      0.2,
+                                    ),
                                     child: Text(
                                       user?.initials ?? 'A',
                                       style: const TextStyle(
@@ -116,7 +162,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ),
                                   const SizedBox(width: 12),
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Bonjour,',
@@ -139,8 +186,10 @@ class _DashboardPageState extends State<DashboardPage> {
                               ),
                               IconButton(
                                 onPressed: () {},
-                                icon: const Icon(Icons.notifications_outlined,
-                                    color: Colors.white),
+                                icon: const Icon(
+                                  Icons.notifications_outlined,
+                                  color: Colors.white,
+                                ),
                               ),
                             ],
                           ),
@@ -211,9 +260,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             padding: const EdgeInsets.all(32),
                             child: Column(
                               children: [
-                                Icon(Icons.event_available,
-                                    size: 64,
-                                    color: AppTheme.textSecondary.withOpacity(0.3)),
+                                Icon(
+                                  Icons.event_available,
+                                  size: 64,
+                                  color: AppTheme.textSecondary.withOpacity(
+                                    0.3,
+                                  ),
+                                ),
                                 const SizedBox(height: 16),
                                 const Text(
                                   "Aucune mission aujourd'hui",
@@ -312,10 +365,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
-            ),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
         ],
       ),
@@ -331,8 +381,11 @@ class _DashboardPageState extends State<DashboardPage> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            Navigator.pushNamed(context, '/mission-detail',
-                arguments: mission.id);
+            Navigator.pushNamed(
+              context,
+              '/mission-detail',
+              arguments: mission.id,
+            );
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -343,7 +396,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -365,8 +420,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 if (mission.siteName != null)
                   Row(
                     children: [
-                      const Icon(Icons.business, size: 18,
-                          color: AppTheme.textSecondary),
+                      const Icon(
+                        Icons.business,
+                        size: 18,
+                        color: AppTheme.textSecondary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -382,8 +440,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 18,
-                        color: AppTheme.textSecondary),
+                    const Icon(
+                      Icons.access_time,
+                      size: 18,
+                      color: AppTheme.textSecondary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '${_formatTimeShort(mission.scheduledStartTime)} - ${_formatTimeShort(mission.scheduledEndTime)}',
@@ -395,8 +456,11 @@ class _DashboardPageState extends State<DashboardPage> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 18,
-                          color: AppTheme.textSecondary),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: AppTheme.textSecondary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
