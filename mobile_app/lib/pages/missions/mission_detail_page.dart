@@ -65,6 +65,17 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     setState(() => _gpsError = null);
 
     try {
+      // 1. Vérifier si le service GPS est activé
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(
+          () => _gpsError =
+              'Le GPS est désactivé. Activez-le dans les paramètres.',
+        );
+        return null;
+      }
+
+      // 2. Vérifier / demander la permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -72,14 +83,30 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        setState(() => _gpsError = 'Permission de localisation refusée');
+        setState(
+          () => _gpsError = permission == LocationPermission.deniedForever
+              ? 'Permission GPS refusée définitivement. Activez-la dans les paramètres.'
+              : 'Permission de localisation refusée.',
+        );
         return null;
       }
 
+      // 3. Obtenir la position (API geolocator 13+ avec LocationSettings)
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
       );
+    } on PermissionDeniedException {
+      setState(() => _gpsError = 'Permission de localisation refusée.');
+      return null;
+    } on LocationServiceDisabledException {
+      setState(
+        () =>
+            _gpsError = 'Le GPS est désactivé. Activez-le dans les paramètres.',
+      );
+      return null;
     } catch (e) {
       setState(() => _gpsError = 'Erreur GPS: ${e.toString()}');
       return null;
@@ -95,6 +122,11 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     try {
       final position = await _getCurrentPosition();
       if (position == null) {
+        // Show the GPS error as a SnackBar as well (for scheduled missions
+        // where the GPS card is not yet visible)
+        if (mounted && _gpsError != null) {
+          _showError(_gpsError!);
+        }
         setState(() => _actionLoading = false);
         return;
       }
@@ -107,7 +139,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       );
       _showSuccess('GPS Check-in enregistré !');
     } catch (e) {
-      _showError('Erreur: ${e.toString()}');
+      _showError('Erreur check-in: ${e.toString()}');
     }
     if (mounted) setState(() => _actionLoading = false);
   }
@@ -148,7 +180,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       setState(() => _photoUploading = true);
 
       final bytes = await image.readAsBytes();
-      
+
       // Check file size (limit to ~500KB)
       if (bytes.length > 500000) {
         _showError('Photo trop grande. Veuillez réessayer.');
@@ -186,10 +218,12 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       setState(() => _photoUploading = true);
 
       final bytes = await image.readAsBytes();
-      
+
       // Check file size (limit to ~500KB)
       if (bytes.length > 500000) {
-        _showError('Photo trop grande (max 500KB). Veuillez choisir une autre photo.');
+        _showError(
+          'Photo trop grande (max 500KB). Veuillez choisir une autre photo.',
+        );
         setState(() => _photoUploading = false);
         return;
       }
@@ -214,7 +248,8 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       builder: (context) => AlertDialog(
         title: const Text('Terminer la mission'),
         content: const Text(
-            'Êtes-vous sûr de vouloir terminer cette mission ?'),
+          'Êtes-vous sûr de vouloir terminer cette mission ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -269,102 +304,110 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: AppTheme.errorColor),
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: AppTheme.errorColor,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: AppTheme.errorColor),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadMission,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            )
+          : _mission == null
+          ? const Center(child: Text('Mission non trouvée'))
+          : RefreshIndicator(
+              onRefresh: _loadMission,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatusBadge(),
+                    const SizedBox(height: 20),
+                    _buildInfoCard(
+                      title: 'Site',
+                      icon: Icons.business,
+                      children: [
+                        if (_mission!.siteName != null)
+                          _buildInfoRow('Nom', _mission!.siteName!),
+                        if (_mission!.siteAddress != null)
+                          _buildInfoRow('Adresse', _mission!.siteAddress!),
+                        if (_mission!.clientName != null)
+                          _buildInfoRow('Client', _mission!.clientName!),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInfoCard(
+                      title: 'Horaires',
+                      icon: Icons.schedule,
+                      children: [
+                        _buildInfoRow(
+                          'Date',
+                          _formatDisplayDate(_mission!.scheduledDate),
+                        ),
+                        _buildInfoRow(
+                          'Horaire prévu',
+                          '${_formatTimeShort(_mission!.scheduledStartTime)} - ${_formatTimeShort(_mission!.scheduledEndTime)}',
+                        ),
+                        if (_mission!.actualStartTime != null)
+                          _buildInfoRow(
+                            'Début réel',
+                            _formatTimeShort(_mission!.actualStartTime),
+                          ),
+                        if (_mission!.actualEndTime != null)
+                          _buildInfoRow(
+                            'Fin réelle',
+                            _formatTimeShort(_mission!.actualEndTime),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // GPS Status Card (when in progress)
+                    if (_mission!.status == InterventionStatus.inProgress)
+                      _buildGPSStatusCard(),
+
+                    // Photos Section (when in progress)
+                    if (_mission!.status == InterventionStatus.inProgress)
+                      _buildPhotosSection(),
+
+                    // Notes
+                    if (_mission!.notes != null &&
+                        _mission!.notes!.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      Text(_error!,
-                          style: const TextStyle(color: AppTheme.errorColor)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadMission,
-                        child: const Text('Réessayer'),
+                      _buildInfoCard(
+                        title: 'Notes',
+                        icon: Icons.note,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(_mission!.notes!),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                )
-              : _mission == null
-                  ? const Center(child: Text('Mission non trouvée'))
-                  : RefreshIndicator(
-                      onRefresh: _loadMission,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildStatusBadge(),
-                            const SizedBox(height: 20),
-                            _buildInfoCard(
-                              title: 'Site',
-                              icon: Icons.business,
-                              children: [
-                                if (_mission!.siteName != null)
-                                  _buildInfoRow('Nom', _mission!.siteName!),
-                                if (_mission!.siteAddress != null)
-                                  _buildInfoRow(
-                                      'Adresse', _mission!.siteAddress!),
-                                if (_mission!.clientName != null)
-                                  _buildInfoRow(
-                                      'Client', _mission!.clientName!),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildInfoCard(
-                              title: 'Horaires',
-                              icon: Icons.schedule,
-                              children: [
-                                _buildInfoRow('Date',
-                                    _formatDisplayDate(_mission!.scheduledDate)),
-                                _buildInfoRow(
-                                  'Horaire prévu',
-                                  '${_formatTimeShort(_mission!.scheduledStartTime)} - ${_formatTimeShort(_mission!.scheduledEndTime)}',
-                                ),
-                                if (_mission!.actualStartTime != null)
-                                  _buildInfoRow('Début réel',
-                                      _formatTimeShort(_mission!.actualStartTime)),
-                                if (_mission!.actualEndTime != null)
-                                  _buildInfoRow('Fin réelle',
-                                      _formatTimeShort(_mission!.actualEndTime)),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
 
-                            // GPS Status Card (when in progress)
-                            if (_mission!.status == InterventionStatus.inProgress)
-                              _buildGPSStatusCard(),
-
-                            // Photos Section (when in progress)
-                            if (_mission!.status == InterventionStatus.inProgress)
-                              _buildPhotosSection(),
-
-                            // Notes
-                            if (_mission!.notes != null &&
-                                _mission!.notes!.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              _buildInfoCard(
-                                title: 'Notes',
-                                icon: Icons.note,
-                                children: [
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    child: Text(_mission!.notes!),
-                                  ),
-                                ],
-                              ),
-                            ],
-
-                            const SizedBox(height: 24),
-                            _buildActionButtons(),
-                            const SizedBox(height: 32),
-                          ],
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -406,14 +449,19 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline,
-                        color: AppTheme.errorColor, size: 18),
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppTheme.errorColor,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _gpsError!,
                         style: const TextStyle(
-                            color: AppTheme.errorColor, fontSize: 13),
+                          color: AppTheme.errorColor,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
@@ -452,9 +500,13 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
             child: Center(
               child: isDone
                   ? const Icon(Icons.check, color: Colors.white, size: 18)
-                  : Text('$step',
+                  : Text(
+                      '$step',
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -480,13 +532,13 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   // ============================================
   // Photos Section
   // ============================================
-  
+
   Widget _buildPhotoImage(String photoData) {
     // Validate photoData is not empty
     if (photoData.isEmpty) {
       return const Icon(Icons.broken_image, color: Colors.grey);
     }
-    
+
     try {
       // Check if it's a data URI with prefix
       if (photoData.startsWith('data:')) {
@@ -500,36 +552,41 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
           return Image.memory(
             base64Decode(base64String),
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.image, color: Colors.grey),
           );
         } else {
           // No comma found or nothing after comma - corrupted data
           return const Icon(Icons.broken_image, color: Colors.red);
         }
       }
-      
+
       // Check if it's a URL (http/https)
       if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
         return Image.network(
           photoData,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.image, color: Colors.grey),
         );
       }
-      
+
       // Otherwise, assume it's raw base64
       if (photoData.length < 10) {
         // Too short to be valid base64
         return const Icon(Icons.broken_image, color: Colors.amber);
       }
-      
+
       return Image.memory(
         base64Decode(photoData),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.image, color: Colors.grey),
       );
     } catch (e) {
-      print('Error decoding photo: $e, photoData length: ${photoData.length}, first 50 chars: ${photoData.substring(0, photoData.length > 50 ? 50 : photoData.length)}');
+      print(
+        'Error decoding photo: $e, photoData length: ${photoData.length}, first 50 chars: ${photoData.substring(0, photoData.length > 50 ? 50 : photoData.length)}',
+      );
       return const Icon(Icons.broken_image, color: Colors.red);
     }
   }
@@ -589,7 +646,8 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Icon(Icons.camera_alt, size: 20),
                     label: const Text('Prendre photo'),
                     style: OutlinedButton.styleFrom(
@@ -636,7 +694,10 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
               : const Icon(Icons.login),
           label: const Text('GPS Check-in (Démarrer la mission)'),
           style: ElevatedButton.styleFrom(
@@ -662,12 +723,13 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.login),
                 label: const Text('GPS Check-in (Arrivée)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
               ),
             ),
 
@@ -684,18 +746,19 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.logout),
                 label: const Text('GPS Check-out (Sortie)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
               ),
             ),
           ],
 
           // Step 3: Complete mission button (always show after check-in)
-          if (_hasCheckedIn) ...[  
+          if (_hasCheckedIn) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -707,7 +770,10 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.check_circle),
                 label: const Text('Terminer la mission'),
                 style: ElevatedButton.styleFrom(
@@ -796,9 +862,13 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
               children: [
                 Icon(icon, color: AppTheme.primaryColor, size: 20),
                 const SizedBox(width: 8),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             const Divider(height: 24),
@@ -817,14 +887,19 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label,
-                style: const TextStyle(
-                    color: AppTheme.textSecondary, fontSize: 14)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w500, fontSize: 14)),
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+            ),
           ),
         ],
       ),
@@ -874,8 +949,19 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     try {
       final dt = DateTime.parse(date);
       final months = [
-        '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+        '',
+        'Janvier',
+        'Février',
+        'Mars',
+        'Avril',
+        'Mai',
+        'Juin',
+        'Juillet',
+        'Août',
+        'Septembre',
+        'Octobre',
+        'Novembre',
+        'Décembre',
       ];
       return '${dt.day} ${months[dt.month]} ${dt.year}';
     } catch (_) {
