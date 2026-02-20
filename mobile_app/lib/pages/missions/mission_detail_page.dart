@@ -117,6 +117,16 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   // Mission Actions
   // ============================================
 
+  /// Silently re-fetch mission data (no loading indicator)
+  Future<void> _refreshMissionSilently() async {
+    try {
+      final fresh = await _api.getMissionById(widget.missionId);
+      if (mounted) setState(() => _mission = fresh);
+    } catch (_) {
+      // Ignore — the inline update already has the essential data
+    }
+  }
+
   Future<void> _performGPSCheckIn() async {
     setState(() => _actionLoading = true);
     try {
@@ -131,13 +141,22 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
         return;
       }
 
-      _mission = await _api.checkIn(
+      final result = await _api.checkIn(
         widget.missionId,
         position.latitude,
         position.longitude,
         accuracy: position.accuracy,
       );
+      if (mounted) {
+        setState(() {
+          _mission = result;
+          _actionLoading = false;
+        });
+      }
       _showSuccess('GPS Check-in enregistré !');
+      // Silently re-fetch to ensure complete data with relations
+      _refreshMissionSilently();
+      return;
     } catch (e) {
       _showError('Erreur check-in: ${e.toString()}');
     }
@@ -149,19 +168,31 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     try {
       final position = await _getCurrentPosition();
       if (position == null) {
+        if (mounted && _gpsError != null) {
+          _showError(_gpsError!);
+        }
         setState(() => _actionLoading = false);
         return;
       }
 
-      _mission = await _api.checkOut(
+      final result = await _api.checkOut(
         widget.missionId,
         position.latitude,
         position.longitude,
         accuracy: position.accuracy,
       );
+      if (mounted) {
+        setState(() {
+          _mission = result;
+          _actionLoading = false;
+        });
+      }
       _showSuccess('GPS Check-out enregistré !');
+      // Silently re-fetch to ensure complete data with relations
+      _refreshMissionSilently();
+      return;
     } catch (e) {
-      _showError('Erreur: ${e.toString()}');
+      _showError('Erreur check-out: ${e.toString()}');
     }
     if (mounted) setState(() => _actionLoading = false);
   }
@@ -682,8 +713,9 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   // Action Buttons
   // ============================================
   Widget _buildActionButtons() {
-    // Scheduled → GPS Check-in (which also starts the mission)
-    if (_mission!.status == InterventionStatus.scheduled) {
+    // Scheduled or Rescheduled → GPS Check-in (which also starts the mission)
+    if (_mission!.status == InterventionStatus.scheduled ||
+        _mission!.status == InterventionStatus.rescheduled) {
       return SizedBox(
         width: double.infinity,
         height: 52,
