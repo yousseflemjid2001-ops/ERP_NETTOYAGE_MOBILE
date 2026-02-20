@@ -389,16 +389,28 @@ class ApiService {
 
   Future<List<ConversationPreview>> getConversations() async {
     final data = await _get('/messages/conversations');
+    // Backend may return a single object or a list
     if (data is List) {
       return data
           .map((e) => ConversationPreview.fromJson(e as Map<String, dynamic>))
           .toList();
+    }
+    if (data is Map<String, dynamic> && data.containsKey('id')) {
+      // Single conversation returned as object
+      return [ConversationPreview.fromJson(data)];
     }
     return [];
   }
 
   Future<List<ChatMessage>> getMessages(String conversationId) async {
     final data = await _get('/messages/conversation/$conversationId');
+    // Backend returns { messages: [...], total: N }
+    if (data is Map && data.containsKey('messages')) {
+      final msgs = data['messages'] as List;
+      return msgs
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
     if (data is List) {
       return data
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))

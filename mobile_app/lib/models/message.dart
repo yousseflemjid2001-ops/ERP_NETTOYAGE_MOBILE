@@ -50,15 +50,25 @@ class ConversationPreview {
     required this.unreadCount,
   });
 
+  /// Parse the real backend format:
+  /// { id, otherUser: { id, firstName, lastName, role, avatarUrl },
+  ///   lastMessage: { content, ... }, unreadCount, lastMessageAt }
   factory ConversationPreview.fromJson(Map<String, dynamic> json) {
+    final otherUser = json['otherUser'] as Map<String, dynamic>? ?? {};
+    final lastMsg = json['lastMessage'] as Map<String, dynamic>?;
+
+    final firstName = otherUser['firstName'] ?? '';
+    final lastName = otherUser['lastName'] ?? '';
+    final name = '$firstName $lastName'.trim();
+
     return ConversationPreview(
       id: json['id'] ?? '',
-      recipientId: json['recipientId'] ?? '',
-      recipientName: json['recipientName'] ?? 'Utilisateur',
-      recipientAvatar: json['recipientAvatar'],
-      recipientRole: json['recipientRole'] ?? '',
-      lastMessage: json['lastMessage'],
-      lastMessageAt: json['lastMessageAt'],
+      recipientId: otherUser['id'] ?? '',
+      recipientName: name.isNotEmpty ? name : 'Utilisateur',
+      recipientAvatar: otherUser['avatarUrl'],
+      recipientRole: otherUser['role'] ?? '',
+      lastMessage: lastMsg?['content'],
+      lastMessageAt: json['lastMessageAt'] ?? lastMsg?['createdAt'],
       unreadCount: json['unreadCount'] ?? 0,
     );
   }
@@ -77,11 +87,16 @@ class ConversationContact {
     required this.role,
   });
 
+  /// Parse: { id, firstName, lastName, role, email, avatarUrl }
   factory ConversationContact.fromJson(Map<String, dynamic> json) {
+    final firstName = json['firstName'] ?? '';
+    final lastName = json['lastName'] ?? '';
+    final name = '$firstName $lastName'.trim();
+
     return ConversationContact(
       id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      avatar: json['avatar'],
+      name: name.isNotEmpty ? name : (json['email'] ?? 'Utilisateur'),
+      avatar: json['avatarUrl'],
       role: json['role'] ?? '',
     );
   }
