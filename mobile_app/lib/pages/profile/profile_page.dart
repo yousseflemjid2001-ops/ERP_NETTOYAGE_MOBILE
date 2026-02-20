@@ -77,20 +77,18 @@ class ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 16),
 
                     if (_profile != null) ...[
-                      _buildInfoSection(
-                        'Contact d\'urgence',
-                        Icons.emergency,
-                        [
-                          _buildInfoTile(
-                            'Nom',
-                            _profile!['emergencyContact']?['name'] ?? 'Non renseigné',
-                          ),
-                          _buildInfoTile(
-                            'Téléphone',
-                            _profile!['emergencyContact']?['phone'] ?? 'Non renseigné',
-                          ),
-                        ],
-                      ),
+                      _buildInfoSection('Contact d\'urgence', Icons.emergency, [
+                        _buildInfoTile(
+                          'Nom',
+                          _profile!['emergencyContact']?['name'] ??
+                              'Non renseigné',
+                        ),
+                        _buildInfoTile(
+                          'Téléphone',
+                          _profile!['emergencyContact']?['phone'] ??
+                              'Non renseigné',
+                        ),
+                      ]),
                       const SizedBox(height: 16),
                     ],
 
@@ -160,10 +158,7 @@ class ProfilePageState extends State<ProfilePage> {
         const SizedBox(height: 4),
         Text(
           user?.email ?? '',
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 14,
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
         ),
         const SizedBox(height: 8),
         Container(
@@ -184,8 +179,7 @@ class ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildInfoSection(
-      String title, IconData icon, List<Widget> children) {
+  Widget _buildInfoSection(String title, IconData icon, List<Widget> children) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -232,10 +226,7 @@ class ProfilePageState extends State<ProfilePage> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             ),
           ),
         ],
@@ -244,16 +235,17 @@ class ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildActionCard(
-      String title, IconData icon, Color color, VoidCallback onTap) {
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return Card(
       child: ListTile(
         leading: Icon(icon, color: color),
         title: Text(
           title,
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: color,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w500, color: color),
         ),
         trailing: Icon(Icons.chevron_right, color: color),
         onTap: onTap,
@@ -289,8 +281,12 @@ class ProfilePageState extends State<ProfilePage> {
 
   void _showEditProfileDialog() {
     final user = context.read<AuthProvider>().user;
-    final firstNameController = TextEditingController(text: user?.firstName ?? '');
-    final lastNameController = TextEditingController(text: user?.lastName ?? '');
+    final firstNameController = TextEditingController(
+      text: user?.firstName ?? '',
+    );
+    final lastNameController = TextEditingController(
+      text: user?.lastName ?? '',
+    );
     final phoneController = TextEditingController(text: user?.phone ?? '');
 
     showModalBottomSheet(
@@ -302,7 +298,11 @@ class ProfilePageState extends State<ProfilePage> {
       builder: (context) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-              16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+            16,
+            16,
+            16,
+            MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,10 +320,7 @@ class ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               const Text(
                 'Modifier mon profil',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
               TextField(

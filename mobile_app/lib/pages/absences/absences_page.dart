@@ -49,9 +49,7 @@ class AbsencesPageState extends State<AbsencesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mes Absences'),
-      ),
+      appBar: AppBar(title: const Text('Mes Absences')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateAbsenceDialog,
         icon: const Icon(Icons.add),
@@ -89,9 +87,11 @@ class AbsencesPageState extends State<AbsencesPage> {
                           padding: const EdgeInsets.all(32),
                           child: Column(
                             children: [
-                              Icon(Icons.event_available,
-                                  size: 64,
-                                  color: AppTheme.textSecondary.withOpacity(0.3)),
+                              Icon(
+                                Icons.event_available,
+                                size: 64,
+                                color: AppTheme.textSecondary.withOpacity(0.3),
+                              ),
                               const SizedBox(height: 16),
                               const Text(
                                 'Aucune demande d\'absence',
@@ -119,10 +119,7 @@ class AbsencesPageState extends State<AbsencesPage> {
           children: [
             const Text(
               'Solde de congés',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Row(
@@ -151,7 +148,8 @@ class AbsencesPageState extends State<AbsencesPage> {
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
                 value: _balance!.vacationDaysAllocated > 0
-                    ? _balance!.vacationDaysUsed / _balance!.vacationDaysAllocated
+                    ? _balance!.vacationDaysUsed /
+                          _balance!.vacationDaysAllocated
                     : 0,
                 backgroundColor: AppTheme.borderColor,
                 valueColor: const AlwaysStoppedAnimation(AppTheme.primaryColor),
@@ -177,10 +175,7 @@ class AbsencesPageState extends State<AbsencesPage> {
         ),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 13,
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
         ),
       ],
     );
@@ -225,8 +220,10 @@ class AbsencesPageState extends State<AbsencesPage> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -307,8 +304,7 @@ class AbsencesPageState extends State<AbsencesPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Annuler la demande'),
-        content:
-            const Text('Êtes-vous sûr de vouloir annuler cette demande ?'),
+        content: const Text('Êtes-vous sûr de vouloir annuler cette demande ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -369,7 +365,11 @@ class AbsencesPageState extends State<AbsencesPage> {
           builder: (context, setSheetState) {
             return Padding(
               padding: EdgeInsets.fromLTRB(
-                  16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,16 +387,15 @@ class AbsencesPageState extends State<AbsencesPage> {
                   const SizedBox(height: 16),
                   const Text(
                     'Nouvelle demande d\'absence',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 20),
 
                   // Absence Type
-                  const Text('Type d\'absence',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Type d\'absence',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -432,8 +431,9 @@ class AbsencesPageState extends State<AbsencesPage> {
                               context: context,
                               initialDate: DateTime.now(),
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 365)),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
                             );
                             if (picked != null) {
                               setSheetState(() {
@@ -459,8 +459,9 @@ class AbsencesPageState extends State<AbsencesPage> {
                               context: context,
                               initialDate: startDate ?? DateTime.now(),
                               firstDate: startDate ?? DateTime.now(),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 365)),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
                             );
                             if (picked != null) {
                               setSheetState(() {
@@ -492,15 +493,16 @@ class AbsencesPageState extends State<AbsencesPage> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: selectedType != null &&
+                      onPressed:
+                          selectedType != null &&
                               startDate != null &&
                               endDate != null
                           ? () => _submitAbsence(
-                                selectedType!,
-                                startDate!,
-                                endDate!,
-                                reasonController.text,
-                              )
+                              selectedType!,
+                              startDate!,
+                              endDate!,
+                              reasonController.text,
+                            )
                           : null,
                       child: const Text('Soumettre la demande'),
                     ),

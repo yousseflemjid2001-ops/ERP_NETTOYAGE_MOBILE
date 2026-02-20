@@ -154,9 +154,7 @@ class AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pointage'),
-      ),
+      appBar: AppBar(title: const Text('Pointage')),
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: _isLoading
@@ -289,11 +287,18 @@ class AttendancePageState extends State<AttendancePage> {
           onPressed: _actionLoading ? null : _clockIn,
           icon: _actionLoading
               ? const SizedBox(
-                  width: 20, height: 20,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
               : const Icon(Icons.login, size: 28),
-          label: const Text('Pointer l\'entrée', style: TextStyle(fontSize: 18)),
+          label: const Text(
+            'Pointer l\'entrée',
+            style: TextStyle(fontSize: 18),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.secondaryColor,
             shape: RoundedRectangleBorder(
@@ -397,7 +402,11 @@ class AttendancePageState extends State<AttendancePage> {
   }
 
   Widget _buildSummaryItem(
-      IconData icon, String value, String label, Color color) {
+    IconData icon,
+    String value,
+    String label,
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, color: color, size: 28),
@@ -413,10 +422,7 @@ class AttendancePageState extends State<AttendancePage> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
       ],
     );
@@ -489,8 +495,19 @@ class AttendancePageState extends State<AttendancePage> {
     try {
       final dt = DateTime.parse(dateTime);
       final months = [
-        '', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-        'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc',
+        '',
+        'Jan',
+        'Fév',
+        'Mar',
+        'Avr',
+        'Mai',
+        'Juin',
+        'Juil',
+        'Aoû',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Déc',
       ];
       return '${dt.day} ${months[dt.month]} ${dt.year}';
     } catch (_) {
