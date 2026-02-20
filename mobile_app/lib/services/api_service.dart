@@ -6,6 +6,7 @@ import '../models/user.dart';
 import '../models/intervention.dart';
 import '../models/absence.dart';
 import '../models/attendance.dart';
+import '../models/message.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -380,6 +381,57 @@ class ApiService {
       'token': token,
       'platform': 'mobile',
     });
+  }
+
+  // ============================================
+  // Messages API
+  // ============================================
+
+  Future<List<ConversationPreview>> getConversations() async {
+    final data = await _get('/messages/conversations');
+    if (data is List) {
+      return data
+          .map((e) => ConversationPreview.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<ChatMessage>> getMessages(String conversationId) async {
+    final data = await _get('/messages/conversation/$conversationId');
+    if (data is List) {
+      return data
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<ConversationContact>> getContacts() async {
+    final data = await _get('/messages/contacts');
+    if (data is List) {
+      return data
+          .map((e) => ConversationContact.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<ChatMessage> sendMessage(String recipientId, String content) async {
+    final data = await _post('/messages/send', {
+      'recipientId': recipientId,
+      'content': content,
+    });
+    return ChatMessage.fromJson(data);
+  }
+
+  Future<void> markMessagesRead(String conversationId) async {
+    await _post('/messages/read', {'conversationId': conversationId});
+  }
+
+  Future<int> getMessagesUnreadCount() async {
+    final data = await _get('/messages/unread-count');
+    return data['count'] ?? 0;
   }
 }
 

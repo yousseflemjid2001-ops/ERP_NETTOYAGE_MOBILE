@@ -13,6 +13,7 @@ import 'pages/missions/mission_detail_page.dart';
 import 'pages/attendance/attendance_page.dart';
 import 'pages/absences/absences_page.dart';
 import 'pages/profile/profile_page.dart';
+import 'pages/messages/conversations_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -133,6 +134,7 @@ class _MainNavigationState extends State<MainNavigation> {
     DashboardPage(),
     MissionsPage(),
     AttendancePage(),
+    ConversationsPage(),
     AbsencesPage(),
     ProfilePage(),
   ];
@@ -192,6 +194,9 @@ class _MainNavigationState extends State<MainNavigation> {
             child: BottomNavigationBar(
               currentIndex: _currentIndex,
               onTap: (index) => setState(() => _currentIndex = index),
+              type: BottomNavigationBarType.fixed,
+              selectedFontSize: 12,
+              unselectedFontSize: 11,
               items: const [
                 BottomNavigationBarItem(
                   icon: Icon(Icons.dashboard_outlined),
@@ -207,6 +212,11 @@ class _MainNavigationState extends State<MainNavigation> {
                   icon: Icon(Icons.fingerprint_outlined),
                   activeIcon: Icon(Icons.fingerprint),
                   label: 'Pointage',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.chat_bubble_outline),
+                  activeIcon: Icon(Icons.chat_bubble),
+                  label: 'Messages',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.event_busy_outlined),
