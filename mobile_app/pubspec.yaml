@@ -28,9 +28,6 @@ dependencies:
   # Camera & gallery
   image_picker: ^1.1.0
 
-  # Google Maps
-  google_maps_flutter: ^2.9.0
-
   # Local notifications
   flutter_local_notifications: ^18.0.1
 

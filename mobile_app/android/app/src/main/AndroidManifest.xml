@@ -28,15 +28,6 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Google Maps API Key (replace YOUR_GOOGLE_MAPS_API_KEY in build.gradle.kts) -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${googleMapsApiKey}"/>
-
-        <!-- FCM default notification channel -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="nettoyage_plus_default"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -21,28 +21,25 @@ android {
 
     defaultConfig {
         applicationId = "com.nettoyageplus.agent"
-        minSdk = flutter.minSdkVersion  // Required by geolocator, firebase, google_maps_flutter
+        minSdk = flutter.minSdkVersion  // Required by geolocator
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // Google Maps API key (replace with your real key from Google Cloud Console)
-        manifestPlaceholders["googleMapsApiKey"] = "YOUR_GOOGLE_MAPS_API_KEY"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Minification disabled: ProGuard can silently strip plugin Java classes and
+            // cause runtime crashes. Flutter AOT compilation already optimises the Dart code.
+            isMinifyEnabled = false
+            isShrinkResources = false
             // TODO: Add your own signing config for the release build.
             signingConfig = signingConfigs.getByName("debug")
         }
         debug {
-            manifestPlaceholders["googleMapsApiKey"] = "YOUR_GOOGLE_MAPS_API_KEY_DEBUG"
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
