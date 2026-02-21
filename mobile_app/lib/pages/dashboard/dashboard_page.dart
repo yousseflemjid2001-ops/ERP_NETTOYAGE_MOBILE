@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/notification_polling_service.dart';
+import '../../services/mission_polling_service.dart';
+import '../../services/notification_service.dart';
 import '../../models/intervention.dart';
 import '../../models/attendance.dart';
 import '../../config/theme.dart';
@@ -25,6 +28,9 @@ class DashboardPageState extends State<DashboardPage>
   int _completedMissions = 0;
   int _unreadNotifications = 0;
   Timer? _autoRefreshTimer;
+  StreamSubscription? _unreadCountSub;
+  StreamSubscription? _missionChangeSub;
+  StreamSubscription? _inAppNotifSub;
 
   @override
   void initState() {
@@ -36,11 +42,67 @@ class DashboardPageState extends State<DashboardPage>
       const Duration(seconds: 15),
       (_) => _refreshShiftStatus(),
     );
+
+    // Listen for unread notification count changes from polling service
+    _unreadCountSub = NotificationPollingService().onUnreadCountChanged.listen((
+      count,
+    ) {
+      if (mounted && count != _unreadNotifications) {
+        setState(() => _unreadNotifications = count);
+      }
+    });
+
+    // Listen for mission changes from mission polling service
+    _missionChangeSub = MissionPollingService().onMissionsChanged.listen((_) {
+      if (mounted) _refreshMissions();
+    });
+
+    // Listen for in-app notifications (show snackbar on web)
+    _inAppNotifSub = NotificationService().onInAppNotification.listen((notif) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notif.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                if (notif.body.isNotEmpty)
+                  Text(
+                    notif.body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+            backgroundColor: AppTheme.primaryColor,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Voir',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _unreadCountSub?.cancel();
+    _missionChangeSub?.cancel();
+    _inAppNotifSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -71,6 +133,37 @@ class DashboardPageState extends State<DashboardPage>
       final count = countData['count'] as int? ?? 0;
       if (mounted && count != _unreadNotifications) {
         setState(() => _unreadNotifications = count);
+      }
+    } catch (_) {}
+  }
+
+  /// Refresh missions data silently (called when MissionPollingService detects changes).
+  Future<void> _refreshMissions() async {
+    final user = context.read<AuthProvider>().user;
+    try {
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final todayMissions = await _api.getMyMissions(
+        agentId: user?.id,
+        dateFrom: today,
+        dateTo: today,
+        sortBy: 'scheduledStartTime',
+        sortOrder: 'ASC',
+      );
+      final allMissions = await _api.getMyMissions(agentId: user?.id);
+      if (mounted) {
+        setState(() {
+          _todayMissions = todayMissions;
+          _pendingMissions = allMissions
+              .where(
+                (m) =>
+                    m.status == InterventionStatus.scheduled ||
+                    m.status == InterventionStatus.inProgress,
+              )
+              .length;
+          _completedMissions = allMissions
+              .where((m) => m.status == InterventionStatus.completed)
+              .length;
+        });
       }
     } catch (_) {}
   }

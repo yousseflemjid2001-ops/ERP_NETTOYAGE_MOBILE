@@ -12,8 +12,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => ProfilePageState();
 }
 
-class ProfilePageState extends State<ProfilePage>
-    with WidgetsBindingObserver {
+class ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   Map<String, dynamic>? _profile;

@@ -5,6 +5,7 @@ import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
+import 'services/notification_polling_service.dart';
 import 'services/offline_service.dart';
 import 'services/api_service.dart';
 import 'pages/auth/login_page.dart';
@@ -21,8 +22,17 @@ import 'pages/notifications/notifications_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Catch all Flutter framework errors (prevents white screen on error)
+  FlutterError.onError = (details) {
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+  };
+
   // Initialisation des notifications locales (sans Firebase)
-  await NotificationService().initialize();
+  try {
+    await NotificationService().initialize();
+  } catch (e) {
+    debugPrint('[main] Notification init error (ignored): $e');
+  }
 
   // Démarrage de la surveillance de connectivité
   ConnectivityService().startMonitoring();
@@ -54,41 +64,57 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityService()),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, auth, _) {
-          // Start/stop mission polling based on auth state
-          if (auth.isAuthenticated && !auth.isLoading) {
-            MissionPollingService().start();
-          } else {
-            MissionPollingService().stop();
+      child: MaterialApp(
+        title: 'Nettoyage Plus - Agent',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const _AppRoot(),
+        onGenerateRoute: (settings) {
+          if (settings.name == '/mission-detail') {
+            final missionId = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => MissionDetailPage(missionId: missionId),
+            );
           }
-
-          return MaterialApp(
-            title: 'Nettoyage Plus - Agent',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            home: auth.isLoading
-                ? const _SplashScreen()
-                : auth.isAuthenticated
-                ? const MainNavigation()
-                : const LoginPage(),
-            onGenerateRoute: (settings) {
-              if (settings.name == '/mission-detail') {
-                final missionId = settings.arguments as String;
-                return MaterialPageRoute(
-                  builder: (_) => MissionDetailPage(missionId: missionId),
-                );
-              }
-              if (settings.name == '/notifications') {
-                return MaterialPageRoute(
-                  builder: (_) => const NotificationsPage(),
-                );
-              }
-              return null;
-            },
-          );
+          if (settings.name == '/notifications') {
+            return MaterialPageRoute(builder: (_) => const NotificationsPage());
+          }
+          return null;
         },
       ),
+    );
+  }
+}
+
+/// Root widget that watches auth state and starts/stops polling services
+/// in lifecycle hooks instead of inside build().
+class _AppRoot extends StatefulWidget {
+  const _AppRoot();
+
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<_AppRoot> {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        // Side effects handled via didUpdateWidget / listener — not here
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (auth.isAuthenticated && !auth.isLoading) {
+            MissionPollingService().start();
+            NotificationPollingService().start();
+          } else if (!auth.isLoading) {
+            MissionPollingService().stop();
+            NotificationPollingService().stop();
+          }
+        });
+
+        if (auth.isLoading) return const _SplashScreen();
+        if (auth.isAuthenticated) return const MainNavigation();
+        return const LoginPage();
+      },
     );
   }
 }

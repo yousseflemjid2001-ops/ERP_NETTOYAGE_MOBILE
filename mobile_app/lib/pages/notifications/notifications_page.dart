@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/notification_polling_service.dart';
 import '../../config/theme.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -15,11 +17,39 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _notifications = [];
   String? _error;
+  Timer? _autoRefreshTimer;
+  StreamSubscription? _newNotifSub;
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
+
+    // Auto-refresh every 10 seconds
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _silentRefresh(),
+    );
+
+    // Listen for new notifications from polling service
+    _newNotifSub = NotificationPollingService().onNewNotifications.listen((_) {
+      _silentRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    _newNotifSub?.cancel();
+    super.dispose();
+  }
+
+  /// Silent refresh without showing loading spinner.
+  Future<void> _silentRefresh() async {
+    try {
+      final data = await _api.getNotifications();
+      if (mounted) setState(() => _notifications = data);
+    } catch (_) {}
   }
 
   Future<void> _loadNotifications() async {
@@ -34,6 +64,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       // Mark all notifications as read when the page is opened
       try {
         await _api.markAllNotificationsAsRead();
+        // Update the polling service count
+        NotificationPollingService().refreshUnreadCount();
       } catch (_) {}
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());

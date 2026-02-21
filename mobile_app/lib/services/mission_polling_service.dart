@@ -22,8 +22,13 @@ class MissionPollingService {
   /// Cached mission IDs → status, used to detect changes.
   final Map<String, _MissionSnapshot> _knownMissions = {};
 
-  /// How often we poll (default 30 seconds).
-  static const Duration pollInterval = Duration(seconds: 30);
+  /// How often we poll (every 15 seconds for more responsive updates).
+  static const Duration pollInterval = Duration(seconds: 15);
+
+  /// Stream that broadcasts when missions have changed (for UI refresh).
+  final StreamController<void> _missionChangedController =
+      StreamController<void>.broadcast();
+  Stream<void> get onMissionsChanged => _missionChangedController.stream;
 
   // ============================================
   // START / STOP
@@ -74,6 +79,7 @@ class MissionPollingService {
 
       // Compare with cache.
       final currentIds = <String>{};
+      bool hasChanges = false;
 
       for (final m in missions) {
         currentIds.add(m.id);
@@ -82,21 +88,31 @@ class MissionPollingService {
         if (old == null) {
           // ====== NEW MISSION ======
           _knownMissions[m.id] = _MissionSnapshot.from(m);
-          await _notifications.showNotification(
-            title: '🆕 Nouvelle mission',
-            body: _buildMissionBody(m),
-            data: {'type': 'new_mission', 'missionId': m.id},
-          );
+          hasChanges = true;
+          try {
+            await _notifications.showMissionNotification(
+              title: '🆕 Nouvelle mission',
+              body: _buildMissionBody(m),
+              data: {'type': 'new_mission', 'missionId': m.id},
+            );
+          } catch (e) {
+            debugPrint('[MissionPolling] Notification error (new): $e');
+          }
           debugPrint('[MissionPolling] New mission: ${m.id}');
         } else if (old.hasChanged(m)) {
           // ====== MODIFIED MISSION ======
           final changeDesc = old.describeChanges(m);
           _knownMissions[m.id] = _MissionSnapshot.from(m);
-          await _notifications.showNotification(
-            title: '📝 Mission modifiée',
-            body: changeDesc,
-            data: {'type': 'mission_updated', 'missionId': m.id},
-          );
+          hasChanges = true;
+          try {
+            await _notifications.showMissionNotification(
+              title: '📝 Mission modifiée',
+              body: changeDesc,
+              data: {'type': 'mission_updated', 'missionId': m.id},
+            );
+          } catch (e) {
+            debugPrint('[MissionPolling] Notification error (update): $e');
+          }
           debugPrint('[MissionPolling] Updated mission: ${m.id}');
         }
       }
@@ -105,14 +121,24 @@ class MissionPollingService {
       final removedIds = _knownMissions.keys.toSet().difference(currentIds);
       for (final id in removedIds) {
         final snapshot = _knownMissions.remove(id);
-        await _notifications.showNotification(
-          title: '❌ Mission retirée',
-          body: snapshot != null
-              ? '${snapshot.siteName ?? "Mission"} le ${snapshot.scheduledDate} a été retirée de votre planning.'
-              : 'Une mission a été retirée de votre planning.',
-          data: {'type': 'mission_removed', 'missionId': id},
-        );
+        hasChanges = true;
+        try {
+          await _notifications.showMissionNotification(
+            title: '❌ Mission retirée',
+            body: snapshot != null
+                ? '${snapshot.siteName ?? "Mission"} le ${snapshot.scheduledDate} a été retirée de votre planning.'
+                : 'Une mission a été retirée de votre planning.',
+            data: {'type': 'mission_removed', 'missionId': id},
+          );
+        } catch (e) {
+          debugPrint('[MissionPolling] Notification error (remove): $e');
+        }
         debugPrint('[MissionPolling] Removed mission: $id');
+      }
+
+      // Notify listeners (UI refresh)
+      if (hasChanges) {
+        _missionChangedController.add(null);
       }
     } catch (e) {
       debugPrint('[MissionPolling] Error: $e');
@@ -128,6 +154,11 @@ class MissionPollingService {
       parts.add('à ${t.length >= 5 ? t.substring(0, 5) : t}');
     }
     return parts.join(' ');
+  }
+
+  void dispose() {
+    stop();
+    _missionChangedController.close();
   }
 }
 

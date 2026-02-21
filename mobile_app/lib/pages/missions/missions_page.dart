@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/mission_polling_service.dart';
 import '../../models/intervention.dart';
 import '../../config/theme.dart';
 
@@ -20,6 +21,7 @@ class MissionsPageState extends State<MissionsPage>
   bool _isLoading = true;
   List<Intervention> _missions = [];
   Timer? _autoRefreshTimer;
+  StreamSubscription? _missionChangeSub;
 
   final List<String> _tabs = ["Aujourd'hui", 'Demain', 'Semaine', 'Toutes'];
 
@@ -39,16 +41,21 @@ class MissionsPageState extends State<MissionsPage>
       }
     });
     _loadMissions();
-    // Auto-refresh every 30 seconds (silent — no loading spinner)
+    // Auto-refresh every 15 seconds (silent — no loading spinner)
     _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 15),
       (_) => _silentRefresh(),
     );
+    // Listen for mission changes from polling service
+    _missionChangeSub = MissionPollingService().onMissionsChanged.listen((_) {
+      _silentRefresh();
+    });
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _missionChangeSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();

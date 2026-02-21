@@ -27,16 +27,25 @@ class AuthProvider with ChangeNotifier {
 
       if (storedUser != null && token != null) {
         _user = storedUser;
-        // Verify token is still valid
+        // Verify token is still valid (with timeout so we don't hang)
         try {
-          _user = await _api.getMe();
+          _user = await _api.getMe().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              // Backend unreachable — keep stored user (offline mode)
+              debugPrint('[Auth] getMe timed out — using stored user');
+              return storedUser;
+            },
+          );
         } catch (e) {
-          // Token expired, clear auth
+          // Token expired or network error — clear auth
+          debugPrint('[Auth] getMe failed: $e');
           await _api.clearAuth();
           _user = null;
         }
       }
     } catch (e) {
+      debugPrint('[Auth] _checkAuth error: $e');
       _user = null;
     }
 
