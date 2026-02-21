@@ -1,19 +1,24 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 
 class ApiConfig {
+  // URL de production Railway
+  static const String productionUrl =
+      'https://erpnettoyage-production-8df4.up.railway.app/api';
+
   // Détecte automatiquement l'environnement d'exécution
   static String get baseUrl {
+    if (kReleaseMode) {
+      // APK Release → toujours Railway production
+      return productionUrl;
+    }
     if (kIsWeb) {
-      // Sur navigateur web → localhost
+      // Debug web → localhost
       return 'http://localhost:3000/api';
     } else {
-      // Sur Android/iOS (APK) → IP locale du serveur
+      // Debug Android → IP locale du serveur
       return 'http://192.168.1.31:3000/api';
     }
   }
-
-  // Pour production:
-  // static const String productionUrl = 'https://your-railway-backend.up.railway.app/api';
 
   static const Duration timeout = Duration(seconds: 30);
 }
