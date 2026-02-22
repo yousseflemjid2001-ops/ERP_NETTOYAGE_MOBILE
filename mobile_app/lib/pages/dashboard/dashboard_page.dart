@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import '../../services/notification_polling_service.dart';
 import '../../services/mission_polling_service.dart';
 import '../../services/notification_service.dart';
@@ -21,6 +22,7 @@ class DashboardPage extends StatefulWidget {
 class DashboardPageState extends State<DashboardPage>
     with WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   bool _isLoading = true;
   ShiftStatus? _shiftStatus;
   List<Intervention> _todayMissions = [];
@@ -36,6 +38,7 @@ class DashboardPageState extends State<DashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreFromCache();
     _loadData();
     // Auto-refresh every 15 seconds to pick up clock-in/out changes
     _autoRefreshTimer = Timer.periodic(
@@ -116,7 +119,63 @@ class DashboardPageState extends State<DashboardPage>
 
   /// Called from MainNavigation when user switches to the dashboard tab.
   void refresh() {
-    _loadData();
+    _silentRefreshAll();
+  }
+
+  /// Instantly populate fields from cache so the UI renders without a spinner.
+  void _restoreFromCache() {
+    final cachedShift = _cache.get<ShiftStatus>(CacheService.dashboardShiftStatus);
+    final cachedMissions = _cache.get<List<Intervention>>(CacheService.dashboardTodayMissions);
+    final cachedPending = _cache.get<int>(CacheService.dashboardPendingCount);
+    final cachedCompleted = _cache.get<int>(CacheService.dashboardCompletedCount);
+    final cachedUnread = _cache.get<int>(CacheService.dashboardUnreadNotifs);
+
+    if (cachedMissions != null || cachedShift != null) {
+      _shiftStatus = cachedShift;
+      _todayMissions = cachedMissions ?? [];
+      _pendingMissions = cachedPending ?? 0;
+      _completedMissions = cachedCompleted ?? 0;
+      _unreadNotifications = cachedUnread ?? 0;
+      _isLoading = false; // skip spinner — we have data
+    }
+  }
+
+  /// Silent full refresh (no spinner).
+  Future<void> _silentRefreshAll() async {
+    final user = context.read<AuthProvider>().user;
+    try {
+      try {
+        final shift = await _api.getShiftStatus();
+        _shiftStatus = shift;
+        _cache.put(CacheService.dashboardShiftStatus, shift);
+      } catch (_) {}
+      try {
+        final countData = await _api.getUnreadCount();
+        final count = countData['count'] as int? ?? 0;
+        _unreadNotifications = count;
+        _cache.put(CacheService.dashboardUnreadNotifs, count);
+      } catch (_) {}
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      try {
+        final missions = await _api.getMyMissions(
+          agentId: user?.id, dateFrom: today, dateTo: today,
+          sortBy: 'scheduledStartTime', sortOrder: 'ASC',
+        );
+        _todayMissions = missions;
+        _cache.put(CacheService.dashboardTodayMissions, missions);
+      } catch (_) {}
+      try {
+        final allMissions = await _api.getMyMissions(agentId: user?.id);
+        _pendingMissions = allMissions.where((m) =>
+            m.status == InterventionStatus.scheduled ||
+            m.status == InterventionStatus.inProgress).length;
+        _completedMissions = allMissions
+            .where((m) => m.status == InterventionStatus.completed).length;
+        _cache.put(CacheService.dashboardPendingCount, _pendingMissions);
+        _cache.put(CacheService.dashboardCompletedCount, _completedMissions);
+      } catch (_) {}
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   /// Lightweight refresh: only shift status (called by timer).
@@ -164,24 +223,30 @@ class DashboardPageState extends State<DashboardPage>
               .where((m) => m.status == InterventionStatus.completed)
               .length;
         });
+        _cache.put(CacheService.dashboardTodayMissions, todayMissions);
+        _cache.put(CacheService.dashboardPendingCount, _pendingMissions);
+        _cache.put(CacheService.dashboardCompletedCount, _completedMissions);
       }
     } catch (_) {}
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    // Only show spinner when we have zero cached data
+    if (_isLoading) setState(() {});
     final user = context.read<AuthProvider>().user;
 
     try {
       // Load shift status
       try {
         _shiftStatus = await _api.getShiftStatus();
+        _cache.put(CacheService.dashboardShiftStatus, _shiftStatus!);
       } catch (_) {}
 
       // Load unread notifications count
       try {
         final countData = await _api.getUnreadCount();
         _unreadNotifications = countData['count'] as int? ?? 0;
+        _cache.put(CacheService.dashboardUnreadNotifs, _unreadNotifications);
       } catch (_) {}
 
       // Load today's missions
@@ -194,6 +259,7 @@ class DashboardPageState extends State<DashboardPage>
           sortBy: 'scheduledStartTime',
           sortOrder: 'ASC',
         );
+        _cache.put(CacheService.dashboardTodayMissions, _todayMissions);
       } catch (_) {}
 
       // Count missions
@@ -209,6 +275,8 @@ class DashboardPageState extends State<DashboardPage>
         _completedMissions = allMissions
             .where((m) => m.status == InterventionStatus.completed)
             .length;
+        _cache.put(CacheService.dashboardPendingCount, _pendingMissions);
+        _cache.put(CacheService.dashboardCompletedCount, _completedMissions);
       } catch (_) {}
     } catch (_) {}
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import '../../config/theme.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -14,6 +15,7 @@ class ProfilePage extends StatefulWidget {
 
 class ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   bool _isLoading = true;
   Map<String, dynamic>? _profile;
   Timer? _autoRefreshTimer;
@@ -22,6 +24,7 @@ class ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreFromCache();
     _loadProfile();
     // Auto-refresh every 60 seconds
     _autoRefreshTimer = Timer.periodic(
@@ -46,13 +49,23 @@ class ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
 
   /// Called externally when user switches to this tab.
   void refresh() {
-    _loadProfile();
+    _silentRefresh();
+  }
+
+  /// Restore cached data so the page shows instantly.
+  void _restoreFromCache() {
+    final cached = _cache.get<Map<String, dynamic>>(CacheService.profileData);
+    if (cached != null) {
+      _profile = cached;
+      _isLoading = false;
+    }
   }
 
   /// Silent refresh without showing loading spinner.
   Future<void> _silentRefresh() async {
     try {
       final profile = await _api.getProfile();
+      _cache.put(CacheService.profileData, profile);
       if (mounted) {
         setState(() => _profile = profile);
       }
@@ -60,9 +73,10 @@ class ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadProfile() async {
-    setState(() => _isLoading = true);
+    if (_isLoading) setState(() {});
     try {
       _profile = await _api.getProfile();
+      _cache.put(CacheService.profileData, _profile!);
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
   }

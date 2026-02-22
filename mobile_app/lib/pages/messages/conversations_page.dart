@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../config/theme.dart';
 import '../../models/message.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import 'chat_page.dart';
 import 'contacts_page.dart';
 
@@ -15,6 +16,7 @@ class ConversationsPage extends StatefulWidget {
 
 class _ConversationsPageState extends State<ConversationsPage> {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   List<ConversationPreview> _conversations = [];
   bool _loading = true;
   Timer? _pollTimer;
@@ -22,11 +24,20 @@ class _ConversationsPageState extends State<ConversationsPage> {
   @override
   void initState() {
     super.initState();
+    _restoreFromCache();
     _loadConversations();
     _pollTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _loadConversations(silent: true),
     );
+  }
+
+  void _restoreFromCache() {
+    final cached = _cache.get<List<ConversationPreview>>(CacheService.conversations);
+    if (cached != null) {
+      _conversations = cached;
+      _loading = false;
+    }
   }
 
   @override
@@ -36,11 +47,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
   }
 
   Future<void> _loadConversations({bool silent = false}) async {
-    if (!silent && mounted) {
-      setState(() => _loading = true);
+    if (!silent && _loading && mounted) {
+      setState(() {});
     }
     try {
       final conversations = await _api.getConversations();
+      _cache.put(CacheService.conversations, conversations);
       if (mounted) {
         setState(() {
           _conversations = conversations;

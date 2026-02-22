@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/notification_polling_service.dart';
+import '../../services/cache_service.dart';
 import '../../config/theme.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -14,6 +15,7 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   bool _isLoading = true;
   List<Map<String, dynamic>> _notifications = [];
   String? _error;
@@ -23,6 +25,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
+    _restoreFromCache();
     _loadNotifications();
 
     // Auto-refresh every 10 seconds
@@ -44,21 +47,31 @@ class _NotificationsPageState extends State<NotificationsPage> {
     super.dispose();
   }
 
+  /// Restore cached notifications instantly.
+  void _restoreFromCache() {
+    final cached = _cache.get<List<Map<String, dynamic>>>(CacheService.notificationsList);
+    if (cached != null) {
+      _notifications = cached;
+      _isLoading = false;
+    }
+  }
+
   /// Silent refresh without showing loading spinner.
   Future<void> _silentRefresh() async {
     try {
       final data = await _api.getNotifications();
+      _cache.put(CacheService.notificationsList, data);
       if (mounted) setState(() => _notifications = data);
     } catch (_) {}
   }
 
   Future<void> _loadNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (_isLoading) {
+      setState(() => _error = null);
+    }
     try {
       final data = await _api.getNotifications();
+      _cache.put(CacheService.notificationsList, data);
       if (mounted) setState(() => _notifications = data);
 
       // Mark all notifications as read when the page is opened

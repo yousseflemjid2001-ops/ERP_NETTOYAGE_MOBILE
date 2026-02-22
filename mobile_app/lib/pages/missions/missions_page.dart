@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import '../../services/mission_polling_service.dart';
 import '../../models/intervention.dart';
 import '../../config/theme.dart';
@@ -17,6 +18,7 @@ class MissionsPage extends StatefulWidget {
 class MissionsPageState extends State<MissionsPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   late TabController _tabController;
   bool _isLoading = true;
   List<Intervention> _missions = [];
@@ -27,7 +29,7 @@ class MissionsPageState extends State<MissionsPage>
 
   /// Called externally when user switches to this tab.
   void refresh() {
-    _loadMissions();
+    _silentRefresh();
   }
 
   @override
@@ -37,10 +39,10 @@ class MissionsPageState extends State<MissionsPage>
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        _loadMissions();
+        _restoreAndRefreshTab();
       }
     });
-    _loadMissions();
+    _restoreAndRefreshTab();
     // Auto-refresh every 15 seconds (silent — no loading spinner)
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -65,6 +67,20 @@ class MissionsPageState extends State<MissionsPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _silentRefresh();
+    }
+  }
+
+  /// Restore cached data for the current tab, then refresh from API.
+  void _restoreAndRefreshTab() {
+    final cacheKey = CacheService.missionsKey(_tabController.index);
+    final cached = _cache.get<List<Intervention>>(cacheKey);
+    if (cached != null) {
+      _missions = cached;
+      _isLoading = false;
+      setState(() {});
+      _silentRefresh();
+    } else {
+      _loadMissions();
     }
   }
 
@@ -100,6 +116,7 @@ class MissionsPageState extends State<MissionsPage>
         sortBy: 'scheduledDate',
         sortOrder: 'ASC',
       );
+      _cache.put(CacheService.missionsKey(_tabController.index), missions);
       if (mounted) {
         setState(() => _missions = missions);
       }
@@ -141,6 +158,7 @@ class MissionsPageState extends State<MissionsPage>
         sortBy: 'scheduledDate',
         sortOrder: 'ASC',
       );
+      _cache.put(CacheService.missionsKey(_tabController.index), _missions);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

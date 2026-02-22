@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _api = ApiService();
@@ -79,6 +80,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     await _api.clearAuth();
+    CacheService().clear();
     _user = null;
     notifyListeners();
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import '../../models/absence.dart';
 import '../../config/theme.dart';
 
@@ -16,6 +17,7 @@ class AbsencesPage extends StatefulWidget {
 class AbsencesPageState extends State<AbsencesPage>
     with WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   bool _isLoading = true;
   List<Absence> _absences = [];
   AbsenceBalance? _balance;
@@ -25,6 +27,7 @@ class AbsencesPageState extends State<AbsencesPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreFromCache();
     _loadData();
     // Auto-refresh every 30 seconds
     _autoRefreshTimer = Timer.periodic(
@@ -49,7 +52,18 @@ class AbsencesPageState extends State<AbsencesPage>
 
   /// Called externally when user switches to this tab.
   void refresh() {
-    _loadData();
+    _silentRefresh();
+  }
+
+  /// Instantly populate fields from cache.
+  void _restoreFromCache() {
+    final cachedAbsences = _cache.get<List<Absence>>(CacheService.absencesList);
+    final cachedBalance = _cache.get<AbsenceBalance>(CacheService.absencesBalance);
+    if (cachedAbsences != null) {
+      _absences = cachedAbsences;
+      _balance = cachedBalance;
+      _isLoading = false;
+    }
   }
 
   /// Silent refresh without showing loading spinner (used by timer).
@@ -57,10 +71,12 @@ class AbsencesPageState extends State<AbsencesPage>
     final user = context.read<AuthProvider>().user;
     try {
       final absences = await _api.getMyAbsences(agentId: user?.id);
+      _cache.put(CacheService.absencesList, absences);
       AbsenceBalance? balance;
       if (user != null) {
         try {
           balance = await _api.getAbsenceBalance(user.id);
+          _cache.put(CacheService.absencesBalance, balance);
         } catch (_) {}
       }
       if (mounted) {
@@ -73,16 +89,18 @@ class AbsencesPageState extends State<AbsencesPage>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (_isLoading) setState(() {});
     final user = context.read<AuthProvider>().user;
 
     try {
       _absences = await _api.getMyAbsences(agentId: user?.id);
+      _cache.put(CacheService.absencesList, _absences);
     } catch (_) {}
 
     try {
       if (user != null) {
         _balance = await _api.getAbsenceBalance(user.id);
+        _cache.put(CacheService.absencesBalance, _balance!);
       }
     } catch (_) {}
 
@@ -404,6 +422,7 @@ class AbsencesPageState extends State<AbsencesPage>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        bool isSubmitting = false;
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return Padding(
@@ -537,17 +556,34 @@ class AbsencesPageState extends State<AbsencesPage>
                     height: 52,
                     child: ElevatedButton(
                       onPressed:
-                          selectedType != null &&
+                          !isSubmitting &&
+                              selectedType != null &&
                               startDate != null &&
                               endDate != null
-                          ? () => _submitAbsence(
-                              selectedType!,
-                              startDate!,
-                              endDate!,
-                              reasonController.text,
-                            )
+                          ? () {
+                              setSheetState(() => isSubmitting = true);
+                              _submitAbsence(
+                                selectedType!,
+                                startDate!,
+                                endDate!,
+                                reasonController.text,
+                              ).whenComplete(() {
+                                if (context.mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                }
+                              });
+                            }
                           : null,
-                      child: const Text('Soumettre la demande'),
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Soumettre la demande'),
                     ),
                   ),
                 ],

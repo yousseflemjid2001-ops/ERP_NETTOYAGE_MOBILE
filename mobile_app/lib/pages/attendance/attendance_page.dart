@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/cache_service.dart';
 import '../../models/attendance.dart';
 import '../../config/theme.dart';
 
@@ -14,6 +15,7 @@ class AttendancePage extends StatefulWidget {
 class AttendancePageState extends State<AttendancePage>
     with WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final CacheService _cache = CacheService();
   bool _isLoading = true;
   bool _actionLoading = false;
   ShiftStatus? _shiftStatus;
@@ -25,6 +27,7 @@ class AttendancePageState extends State<AttendancePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _restoreFromCache();
     _loadData();
     // Auto-refresh every 15 seconds to keep shift status up to date
     _autoRefreshTimer = Timer.periodic(
@@ -49,7 +52,20 @@ class AttendancePageState extends State<AttendancePage>
 
   /// Called externally when user switches to this tab.
   void refresh() {
-    _loadData();
+    _silentRefresh();
+  }
+
+  /// Instantly populate fields from cache.
+  void _restoreFromCache() {
+    final cachedShift = _cache.get<ShiftStatus>(CacheService.attendanceShift);
+    final cachedSummary = _cache.get<DailySummary>(CacheService.attendanceSummary);
+    final cachedHistory = _cache.get<List<Attendance>>(CacheService.attendanceHistory);
+    if (cachedShift != null || cachedHistory != null) {
+      _shiftStatus = cachedShift;
+      _dailySummary = cachedSummary;
+      _history = cachedHistory ?? [];
+      _isLoading = false;
+    }
   }
 
   /// Silent refresh without showing loading spinner (used by timer).
@@ -58,6 +74,9 @@ class AttendancePageState extends State<AttendancePage>
       final status = await _api.getShiftStatus();
       final summary = await _api.getDailySummary();
       final history = await _api.getAttendanceHistory();
+      _cache.put(CacheService.attendanceShift, status);
+      _cache.put(CacheService.attendanceSummary, summary);
+      _cache.put(CacheService.attendanceHistory, history);
       if (mounted) {
         setState(() {
           _shiftStatus = status;
@@ -69,18 +88,21 @@ class AttendancePageState extends State<AttendancePage>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (_isLoading) setState(() {});
 
     try {
       _shiftStatus = await _api.getShiftStatus();
+      _cache.put(CacheService.attendanceShift, _shiftStatus!);
     } catch (_) {}
 
     try {
       _dailySummary = await _api.getDailySummary();
+      _cache.put(CacheService.attendanceSummary, _dailySummary!);
     } catch (_) {}
 
     try {
       _history = await _api.getAttendanceHistory();
+      _cache.put(CacheService.attendanceHistory, _history);
     } catch (_) {}
 
     if (mounted) setState(() => _isLoading = false);
