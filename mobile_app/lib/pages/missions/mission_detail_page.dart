@@ -26,6 +26,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   String? _gpsError;
   final List<Uint8List> _capturedPhotos = [];
   bool _photoUploading = false;
+  static const int _maxPhotos = 3;
 
   // Derived state from mission data
   bool get _hasCheckedIn =>
@@ -197,7 +198,19 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
     if (mounted) setState(() => _actionLoading = false);
   }
 
+  int get _currentPhotoCount {
+    final serverPhotos = _mission?.photoUrls.length ?? 0;
+    return serverPhotos + _capturedPhotos.length;
+  }
+
+  int get _remainingPhotoSlots => _maxPhotos - _currentPhotoCount;
+
   Future<void> _takePhoto() async {
+    if (_remainingPhotoSlots <= 0) {
+      _showError('Maximum $_maxPhotos photos atteint.');
+      return;
+    }
+
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -219,15 +232,11 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
         return;
       }
 
-      // Send only base64 without data URI prefix (simple-array doesn't support special chars)
       final base64Image = base64Encode(bytes);
-
-      // Upload to API
       _mission = await _api.addPhoto(widget.missionId, base64Image);
 
-      // Add to local preview
       setState(() => _capturedPhotos.add(bytes));
-      _showSuccess('Photo ajoutée !');
+      _showSuccess('Photo ajoutée ! ($_currentPhotoCount/$_maxPhotos)');
     } catch (e) {
       _showError('Erreur photo: ${e.toString()}');
     } finally {
@@ -236,36 +245,48 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   }
 
   Future<void> _pickPhotoFromGallery() async {
+    final remaining = _remainingPhotoSlots;
+    if (remaining <= 0) {
+      _showError('Maximum $_maxPhotos photos atteint.');
+      return;
+    }
+
     try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
+      // Allow picking multiple images from gallery
+      final List<XFile> images = await _picker.pickMultiImage(
         maxWidth: 800,
         maxHeight: 800,
         imageQuality: 60,
+        limit: remaining,
       );
 
-      if (image == null) return;
+      if (images.isEmpty) return;
+
+      // Enforce the limit
+      final selected = images.take(remaining).toList();
 
       setState(() => _photoUploading = true);
 
-      final bytes = await image.readAsBytes();
+      int uploaded = 0;
+      for (final image in selected) {
+        final bytes = await image.readAsBytes();
 
-      // Check file size (limit to ~500KB)
-      if (bytes.length > 500000) {
-        _showError(
-          'Photo trop grande (max 500KB). Veuillez choisir une autre photo.',
-        );
-        setState(() => _photoUploading = false);
-        return;
+        if (bytes.length > 500000) {
+          _showError('Une photo est trop grande (max 500KB) — ignorée.');
+          continue;
+        }
+
+        final base64Image = base64Encode(bytes);
+        _mission = await _api.addPhoto(widget.missionId, base64Image);
+        setState(() => _capturedPhotos.add(bytes));
+        uploaded++;
       }
 
-      // Send only base64 without data URI prefix (simple-array doesn't support special chars)
-      final base64Image = base64Encode(bytes);
-
-      _mission = await _api.addPhoto(widget.missionId, base64Image);
-
-      setState(() => _capturedPhotos.add(bytes));
-      _showSuccess('Photo ajoutée !');
+      if (uploaded > 0) {
+        _showSuccess(
+          '$uploaded photo${uploaded > 1 ? 's' : ''} ajoutée${uploaded > 1 ? 's' : ''} ! ($_currentPhotoCount/$_maxPhotos)',
+        );
+      }
     } catch (e) {
       _showError('Erreur photo: ${e.toString()}');
     } finally {
@@ -625,14 +646,49 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
   Widget _buildPhotosSection() {
     final existingPhotos = _mission?.photoUrls ?? [];
     final totalPhotos = existingPhotos.length + _capturedPhotos.length;
+    final canAddMore = totalPhotos < _maxPhotos;
 
     return Column(
       children: [
         const SizedBox(height: 16),
         _buildInfoCard(
-          title: 'Photos ($totalPhotos)',
+          title: 'Photos ($totalPhotos/$_maxPhotos)',
           icon: Icons.camera_alt,
           children: [
+            // Limit info
+            if (!canAddMore)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.orange.shade700,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Limite de $_maxPhotos photos atteinte',
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Photo grid
             if (totalPhotos > 0) ...[
               Wrap(
@@ -668,41 +724,44 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
             ],
 
             // Photo action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _photoUploading ? null : _takePhoto,
-                    icon: _photoUploading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.camera_alt, size: 20),
-                    label: const Text('Prendre photo'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primaryColor,
-                      side: const BorderSide(color: AppTheme.primaryColor),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+            if (canAddMore)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _photoUploading ? null : _takePhoto,
+                      icon: _photoUploading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.camera_alt, size: 20),
+                      label: const Text('Prendre photo'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                        side: const BorderSide(color: AppTheme.primaryColor),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _photoUploading ? null : _pickPhotoFromGallery,
-                    icon: const Icon(Icons.photo_library, size: 20),
-                    label: const Text('Galerie'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.deepPurple,
-                      side: const BorderSide(color: Colors.deepPurple),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _photoUploading ? null : _pickPhotoFromGallery,
+                      icon: const Icon(Icons.photo_library, size: 20),
+                      label: Text(
+                        'Galerie${_remainingPhotoSlots < _maxPhotos ? ' (${_remainingPhotoSlots})' : ''}',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.deepPurple,
+                        side: const BorderSide(color: Colors.deepPurple),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ],

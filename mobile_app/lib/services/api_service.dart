@@ -108,14 +108,41 @@ class ApiService {
       if (response.body.isEmpty) return {};
       return jsonDecode(response.body);
     } else {
-      final error = response.body.isNotEmpty
-          ? jsonDecode(response.body)
-          : {'message': 'Erreur inconnue'};
-      throw ApiException(
-        response.statusCode,
-        error['message'] ?? 'Erreur serveur',
-      );
+      Map<String, dynamic> error = {};
+      try {
+        error = response.body.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(response.body))
+            : {};
+      } catch (_) {}
+
+      // NestJS can return message as a List (validation errors) or String
+      final rawMessage = error['message'];
+      String message;
+      if (rawMessage is List && rawMessage.isNotEmpty) {
+        message = rawMessage.first.toString();
+      } else if (rawMessage is String && rawMessage.isNotEmpty) {
+        message = rawMessage;
+      } else {
+        message = '';
+      }
+
+      // Translate common English NestJS errors to French
+      final translated = _translateHttpError(message, response.statusCode);
+      throw ApiException(response.statusCode, translated);
     }
+  }
+
+  String _translateHttpError(String message, int statusCode) {
+    if (statusCode == 401) return 'Email ou mot de passe incorrect.';
+    if (statusCode == 403) return 'Accès refusé.';
+    if (statusCode == 404) return 'Utilisateur introuvable.';
+    if (statusCode == 429) return 'Trop de tentatives. Réessayez plus tard.';
+    if (statusCode >= 500) return 'Erreur serveur. Réessayez plus tard.';
+    if (message.toLowerCase() == 'unauthorized')
+      return 'Email ou mot de passe incorrect.';
+    if (message.toLowerCase() == 'forbidden') return 'Accès refusé.';
+    if (message.isNotEmpty) return message;
+    return 'Erreur inconnue (code $statusCode).';
   }
 
   // ============================================

@@ -16,6 +16,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -27,54 +28,39 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-    final authProvider = context.read<AuthProvider>();
-    authProvider.clearError();
+    try {
+      final authProvider = context.read<AuthProvider>();
+      authProvider.clearError();
 
-    final success = await authProvider.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+      final success = await authProvider.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-
-      if (!success && authProvider.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    authProvider.error!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppTheme.errorColor,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
-          ),
-        );
+      if (mounted) {
+        if (!success) {
+          final msg = authProvider.error ?? 'Email ou mot de passe incorrect.';
+          debugPrint('[Login] Login failed: $msg');
+          setState(() {
+            _isLoading = false;
+            _errorMessage = msg;
+          });
+        } else {
+          setState(() => _isLoading = false);
+        }
+      }
+    } catch (e) {
+      debugPrint('[Login] Exception during login: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Email ou mot de passe incorrect.';
+        });
       }
     }
   }
@@ -127,10 +113,58 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 40),
 
+                  // Error Banner
+                  if (_errorMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.errorColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.errorColor.withOpacity(0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: AppTheme.errorColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: AppTheme.errorColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _errorMessage = null),
+                            child: Icon(
+                              Icons.close,
+                              color: AppTheme.errorColor,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Email Field
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) => setState(() => _errorMessage = null),
                     decoration: const InputDecoration(
                       labelText: 'Email',
                       hintText: 'votre@email.com',
@@ -152,6 +186,7 @@ class _LoginPageState extends State<LoginPage> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
+                    onChanged: (_) => setState(() => _errorMessage = null),
                     decoration: InputDecoration(
                       labelText: 'Mot de passe',
                       hintText: '••••••••',
