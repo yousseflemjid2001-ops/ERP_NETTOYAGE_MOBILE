@@ -133,12 +133,22 @@ class NotificationService {
       playSound: true,
     );
 
+    const messageChannel = AndroidNotificationChannel(
+      'nettoyage_plus_messages',
+      'Messages',
+      description: 'Notifications de nouveaux messages',
+      importance: Importance.high,
+      enableVibration: true,
+      playSound: true,
+    );
+
     final android = _localNotifications
         ?.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     await android?.createNotificationChannel(defaultChannel);
     await android?.createNotificationChannel(missionChannel);
+    await android?.createNotificationChannel(messageChannel);
   }
 
   /// Demande la permission POST_NOTIFICATIONS sur Android 13+ (API 33+).
@@ -238,6 +248,55 @@ class NotificationService {
       body: '$count action(s) synchronisée(s) avec succès.',
       data: {'type': 'sync'},
     );
+  }
+
+  /// Notification spécifique aux messages (canal dédié).
+  Future<void> showMessageNotification({
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    // Always emit to in-app stream
+    _inAppController.add(
+      InAppNotification(title: title, body: body, data: data),
+    );
+    _unreadInAppCount++;
+    _unreadCountController.add(_unreadInAppCount);
+
+    if (!_nativeSupported) return;
+
+    try {
+      final androidDetails = AndroidNotificationDetails(
+        'nettoyage_plus_messages',
+        'Messages',
+        channelDescription: 'Notifications de nouveaux messages',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        color: const Color(0xFF2563EB),
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _localNotifications?.show(
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title,
+        body,
+        details,
+        payload: data != null ? jsonEncode(data) : null,
+      );
+    } catch (e) {
+      debugPrint('[Notifications] Message notification native show failed: $e');
+    }
   }
 
   /// Notification de rappel de mission.

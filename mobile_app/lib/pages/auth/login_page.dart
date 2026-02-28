@@ -43,8 +43,36 @@ class _LoginPageState extends State<LoginPage> {
       if (!success && authProvider.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.error!),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    authProvider.error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
           ),
         );
       }

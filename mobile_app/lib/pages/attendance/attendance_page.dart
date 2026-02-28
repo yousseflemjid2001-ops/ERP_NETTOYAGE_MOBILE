@@ -58,8 +58,12 @@ class AttendancePageState extends State<AttendancePage>
   /// Instantly populate fields from cache.
   void _restoreFromCache() {
     final cachedShift = _cache.get<ShiftStatus>(CacheService.attendanceShift);
-    final cachedSummary = _cache.get<DailySummary>(CacheService.attendanceSummary);
-    final cachedHistory = _cache.get<List<Attendance>>(CacheService.attendanceHistory);
+    final cachedSummary = _cache.get<DailySummary>(
+      CacheService.attendanceSummary,
+    );
+    final cachedHistory = _cache.get<List<Attendance>>(
+      CacheService.attendanceHistory,
+    );
     if (cachedShift != null || cachedHistory != null) {
       _shiftStatus = cachedShift;
       _dailySummary = cachedSummary;

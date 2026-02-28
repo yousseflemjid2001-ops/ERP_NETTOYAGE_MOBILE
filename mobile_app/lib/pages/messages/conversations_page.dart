@@ -33,7 +33,9 @@ class _ConversationsPageState extends State<ConversationsPage> {
   }
 
   void _restoreFromCache() {
-    final cached = _cache.get<List<ConversationPreview>>(CacheService.conversations);
+    final cached = _cache.get<List<ConversationPreview>>(
+      CacheService.conversations,
+    );
     if (cached != null) {
       _conversations = cached;
       _loading = false;

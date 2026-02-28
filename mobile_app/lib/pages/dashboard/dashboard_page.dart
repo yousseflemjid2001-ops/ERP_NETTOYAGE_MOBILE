@@ -124,10 +124,16 @@ class DashboardPageState extends State<DashboardPage>
 
   /// Instantly populate fields from cache so the UI renders without a spinner.
   void _restoreFromCache() {
-    final cachedShift = _cache.get<ShiftStatus>(CacheService.dashboardShiftStatus);
-    final cachedMissions = _cache.get<List<Intervention>>(CacheService.dashboardTodayMissions);
+    final cachedShift = _cache.get<ShiftStatus>(
+      CacheService.dashboardShiftStatus,
+    );
+    final cachedMissions = _cache.get<List<Intervention>>(
+      CacheService.dashboardTodayMissions,
+    );
     final cachedPending = _cache.get<int>(CacheService.dashboardPendingCount);
-    final cachedCompleted = _cache.get<int>(CacheService.dashboardCompletedCount);
+    final cachedCompleted = _cache.get<int>(
+      CacheService.dashboardCompletedCount,
+    );
     final cachedUnread = _cache.get<int>(CacheService.dashboardUnreadNotifs);
 
     if (cachedMissions != null || cachedShift != null) {
@@ -158,19 +164,27 @@ class DashboardPageState extends State<DashboardPage>
       final today = DateTime.now().toIso8601String().split('T')[0];
       try {
         final missions = await _api.getMyMissions(
-          agentId: user?.id, dateFrom: today, dateTo: today,
-          sortBy: 'scheduledStartTime', sortOrder: 'ASC',
+          agentId: user?.id,
+          dateFrom: today,
+          dateTo: today,
+          sortBy: 'scheduledStartTime',
+          sortOrder: 'ASC',
         );
         _todayMissions = missions;
         _cache.put(CacheService.dashboardTodayMissions, missions);
       } catch (_) {}
       try {
         final allMissions = await _api.getMyMissions(agentId: user?.id);
-        _pendingMissions = allMissions.where((m) =>
-            m.status == InterventionStatus.scheduled ||
-            m.status == InterventionStatus.inProgress).length;
+        _pendingMissions = allMissions
+            .where(
+              (m) =>
+                  m.status == InterventionStatus.scheduled ||
+                  m.status == InterventionStatus.inProgress,
+            )
+            .length;
         _completedMissions = allMissions
-            .where((m) => m.status == InterventionStatus.completed).length;
+            .where((m) => m.status == InterventionStatus.completed)
+            .length;
         _cache.put(CacheService.dashboardPendingCount, _pendingMissions);
         _cache.put(CacheService.dashboardCompletedCount, _completedMissions);
       } catch (_) {}

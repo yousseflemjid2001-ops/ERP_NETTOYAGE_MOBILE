@@ -58,7 +58,9 @@ class AbsencesPageState extends State<AbsencesPage>
   /// Instantly populate fields from cache.
   void _restoreFromCache() {
     final cachedAbsences = _cache.get<List<Absence>>(CacheService.absencesList);
-    final cachedBalance = _cache.get<AbsenceBalance>(CacheService.absencesBalance);
+    final cachedBalance = _cache.get<AbsenceBalance>(
+      CacheService.absencesBalance,
+    );
     if (cachedAbsences != null) {
       _absences = cachedAbsences;
       _balance = cachedBalance;

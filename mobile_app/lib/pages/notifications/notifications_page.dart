@@ -49,7 +49,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   /// Restore cached notifications instantly.
   void _restoreFromCache() {
-    final cached = _cache.get<List<Map<String, dynamic>>>(CacheService.notificationsList);
+    final cached = _cache.get<List<Map<String, dynamic>>>(
+      CacheService.notificationsList,
+    );
     if (cached != null) {
       _notifications = cached;
       _isLoading = false;

@@ -17,6 +17,7 @@ import 'pages/absences/absences_page.dart';
 import 'pages/profile/profile_page.dart';
 import 'pages/messages/conversations_page.dart';
 import 'services/mission_polling_service.dart';
+import 'services/message_polling_service.dart';
 import 'pages/notifications/notifications_page.dart';
 
 void main() async {
@@ -105,9 +106,11 @@ class _AppRootState extends State<_AppRoot> {
           if (auth.isAuthenticated && !auth.isLoading) {
             MissionPollingService().start();
             NotificationPollingService().start();
+            MessagePollingService().start();
           } else if (!auth.isLoading) {
             MissionPollingService().stop();
             NotificationPollingService().stop();
+            MessagePollingService().stop();
           }
         });
 
@@ -170,7 +173,10 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  int _messageUnreadCount = 0;
   late final StreamSubscription _notificationSub;
+  late final StreamSubscription _msgNotificationSub;
+  late final StreamSubscription _msgUnreadSub;
 
   final GlobalKey<DashboardPageState> _dashboardKey = GlobalKey();
   final GlobalKey<MissionsPageState> _missionsKey = GlobalKey();
@@ -190,7 +196,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
-    // Listen for notification taps to navigate to mission detail
+    // Listen for notification taps to navigate
     _notificationSub = NotificationService().onNotificationTap.listen((data) {
       final type = data['type'];
       final missionId = data['missionId'];
@@ -204,12 +210,83 @@ class _MainNavigationState extends State<MainNavigation> {
           Navigator.pushNamed(context, '/mission-detail', arguments: missionId);
         }
       }
+      // Navigate to messages tab on message notification tap
+      if (type == 'new_message') {
+        setState(() => _currentIndex = 3);
+      }
+    });
+
+    // Listen for in-app message notifications (in-app stream)
+    _msgNotificationSub = NotificationService().onInAppNotification.listen((
+      notif,
+    ) {
+      if (notif.data?['type'] == 'new_message') {
+        // Show in-app snackbar if not on messages tab
+        if (_currentIndex != 3 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.chat_bubble, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notif.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          notif.body,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppTheme.primaryColor,
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              duration: const Duration(seconds: 3),
+              action: SnackBarAction(
+                label: 'Voir',
+                textColor: Colors.white,
+                onPressed: () => setState(() => _currentIndex = 3),
+              ),
+            ),
+          );
+        }
+      }
+    });
+
+    // Track unread message count for badge
+    _msgUnreadSub = MessagePollingService().onUnreadCountChanged.listen((
+      count,
+    ) {
+      if (mounted) setState(() => _messageUnreadCount = count);
     });
   }
 
   @override
   void dispose() {
     _notificationSub.cancel();
+    _msgNotificationSub.cancel();
+    _msgUnreadSub.cancel();
     super.dispose();
   }
 
@@ -227,6 +304,10 @@ class _MainNavigationState extends State<MainNavigation> {
         _attendanceKey.currentState?.refresh();
         break;
       // case 3: ConversationsPage already has its own polling
+      case 3:
+        // Refresh unread count when switching to messages
+        MessagePollingService().refreshUnreadCount();
+        break;
       case 4:
         _absencesKey.currentState?.refresh();
         break;
@@ -294,33 +375,53 @@ class _MainNavigationState extends State<MainNavigation> {
               type: BottomNavigationBarType.fixed,
               selectedFontSize: 12,
               unselectedFontSize: 11,
-              items: const [
-                BottomNavigationBarItem(
+              items: [
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.dashboard_outlined),
                   activeIcon: Icon(Icons.dashboard),
                   label: 'Accueil',
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.assignment_outlined),
                   activeIcon: Icon(Icons.assignment),
                   label: 'Missions',
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.fingerprint_outlined),
                   activeIcon: Icon(Icons.fingerprint),
                   label: 'Pointage',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  activeIcon: Icon(Icons.chat_bubble),
+                  icon: _messageUnreadCount > 0
+                      ? Badge(
+                          label: Text(
+                            _messageUnreadCount > 99
+                                ? '99+'
+                                : '$_messageUnreadCount',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          child: const Icon(Icons.chat_bubble_outline),
+                        )
+                      : const Icon(Icons.chat_bubble_outline),
+                  activeIcon: _messageUnreadCount > 0
+                      ? Badge(
+                          label: Text(
+                            _messageUnreadCount > 99
+                                ? '99+'
+                                : '$_messageUnreadCount',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          child: const Icon(Icons.chat_bubble),
+                        )
+                      : const Icon(Icons.chat_bubble),
                   label: 'Messages',
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.event_busy_outlined),
                   activeIcon: Icon(Icons.event_busy),
                   label: 'Absences',
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(Icons.person_outline),
                   activeIcon: Icon(Icons.person),
                   label: 'Profil',
