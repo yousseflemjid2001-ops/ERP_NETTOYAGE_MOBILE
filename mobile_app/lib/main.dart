@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:workmanager/workmanager.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
 import 'services/notification_polling_service.dart';
+import 'services/background_notification_service.dart';
 import 'services/offline_service.dart';
 import 'services/api_service.dart';
 import 'pages/auth/login_page.dart';
@@ -37,6 +39,24 @@ void main() async {
 
   // Démarrage de la surveillance de connectivité
   ConnectivityService().startMonitoring();
+
+  // Initialiser WorkManager pour le polling en arrière-plan
+  try {
+    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    // Enregistrer une tâche périodique (minimum 15 min sur Android)
+    await Workmanager().registerPeriodicTask(
+      'notificationPolling',
+      backgroundNotificationTask,
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+      backoffPolicy: BackoffPolicy.linear,
+      backoffPolicyDelay: const Duration(minutes: 1),
+    );
+    debugPrint('[main] WorkManager background polling registered');
+  } catch (e) {
+    debugPrint('[main] WorkManager init error (ignored): $e');
+  }
 
   // Sync offline automatique quand la connexion revient
   ConnectivityService().onConnected.listen((_) async {
@@ -96,7 +116,30 @@ class _AppRoot extends StatefulWidget {
   State<_AppRoot> createState() => _AppRootState();
 }
 
-class _AppRootState extends State<_AppRoot> {
+class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came back to foreground — immediately poll for new notifications
+      debugPrint('[AppRoot] Resumed — forcing notification poll');
+      NotificationPollingService().start(); // no-op if already running
+      MissionPollingService().start();
+      MessagePollingService().start();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(

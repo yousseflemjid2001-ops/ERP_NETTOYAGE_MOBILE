@@ -235,7 +235,9 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
       final base64Image = base64Encode(bytes);
       _mission = await _api.addPhoto(widget.missionId, base64Image);
 
-      setState(() => _capturedPhotos.add(bytes));
+      // No need to add to _capturedPhotos — the server response in _mission
+      // already contains the new photo in photoUrls.
+      if (mounted) setState(() {});
       _showSuccess('Photo ajoutée ! ($_currentPhotoCount/$_maxPhotos)');
     } catch (e) {
       _showError('Erreur photo: ${e.toString()}');
@@ -278,7 +280,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
 
         final base64Image = base64Encode(bytes);
         _mission = await _api.addPhoto(widget.missionId, base64Image);
-        setState(() => _capturedPhotos.add(bytes));
+        // Photo is now in _mission.photoUrls from server response — no local duplicate.
         uploaded++;
       }
 

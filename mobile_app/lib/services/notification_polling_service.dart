@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
+import 'background_notification_service.dart';
 
 /// Polls the backend every [pollInterval] for new notifications (from admin
 /// or system) and triggers local/in-app notifications when a new one appears.
@@ -94,6 +95,8 @@ class NotificationPollingService {
           final id = n['id'] as String?;
           if (id != null) _knownIds.add(id);
         }
+        // Sync to SharedPreferences so background isolate knows these IDs
+        syncKnownIdsToPrefs(_knownIds);
         debugPrint(
           '[NotifPolling] Initial cache: ${_knownIds.length} notifications',
         );
@@ -108,6 +111,11 @@ class NotificationPollingService {
           _knownIds.add(id);
           newNotifs.add(n);
         }
+      }
+
+      // Sync known IDs to SharedPreferences for background isolate
+      if (newNotifs.isNotEmpty) {
+        syncKnownIdsToPrefs(_knownIds);
       }
 
       // Show local notifications for new backend notifications
