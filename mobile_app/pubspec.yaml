@@ -25,6 +25,9 @@ dependencies:
   # GPS
   geolocator: ^13.0.0
 
+  # Maps
+  google_maps_flutter: ^2.10.0
+
   # Camera & gallery
   image_picker: ^1.1.0
 
