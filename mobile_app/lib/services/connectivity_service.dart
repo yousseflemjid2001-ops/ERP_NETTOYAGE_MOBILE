@@ -21,7 +21,7 @@ class ConnectivityService with ChangeNotifier {
 
   /// Stream filtré : émet uniquement quand la connexion est rétablie.
   Stream<void> get onConnected =>
-      _controller.stream.where((online) => online).map((_) => null);
+      _controller.stream.where((online) => online).map((_) {});
 
   /// Démarre la surveillance périodique (toutes les 5 secondes).
   void startMonitoring() {

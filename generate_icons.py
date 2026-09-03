@@ -1,118 +1,80 @@
 """
-Generate Nettoyage Plus app icons for Android and iOS.
-Design: Emerald green gradient background, rounded rect, white 'NP' text with sparkle accent.
+Generate Nettoyage Plus official app icons for Android, iOS and Web from the official vector logo.
+Design: Circular Sapphire to Cyan gradient background with stylized 'N' and sparkle.
 """
 import os
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-def draw_rounded_rect(draw, xy, radius, fill):
-    x0, y0, x1, y1 = xy
-    draw.rectangle([x0 + radius, y0, x1 - radius, y1], fill=fill)
-    draw.rectangle([x0, y0 + radius, x1, y1 - radius], fill=fill)
-    draw.ellipse([x0, y0, x0 + radius * 2, y0 + radius * 2], fill=fill)
-    draw.ellipse([x1 - radius * 2, y0, x1, y0 + radius * 2], fill=fill)
-    draw.ellipse([x0, y1 - radius * 2, x0 + radius * 2, y1], fill=fill)
-    draw.ellipse([x1 - radius * 2, y1 - radius * 2, x1, y1], fill=fill)
+def make_logo(size, circle=True):
+    # Render at 2x for supersampled anti-aliasing
+    render_size = size * 2
+    scale = render_size / 64.0
 
-def make_gradient(size):
-    """Create emerald green gradient background."""
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    # Top-left: #10b981 (emerald-500), bottom-right: #059669 (emerald-600)
-    r1, g1, b1 = 0x10, 0xb9, 0x81   # emerald-500
-    r2, g2, b2 = 0x05, 0x96, 0x69   # emerald-600
-    for y in range(size):
-        t = y / size
-        r = int(r1 + (r2 - r1) * t)
-        g = int(g1 + (g2 - g1) * t)
-        b = int(b1 + (b2 - b1) * t)
-        draw.line([(0, y), (size, y)], fill=(r, g, b, 255))
-    return img
+    img = Image.new('RGBA', (render_size, render_size), (0, 0, 0, 0))
 
-def draw_sparkle(draw, cx, cy, size, color):
-    """Draw a simple 4-point sparkle."""
-    r = size // 2
-    r_inner = r // 4
-    n = 8
-    points = []
-    for i in range(n):
-        angle = math.pi * 2 * i / n - math.pi / 2
-        if i % 2 == 0:
-            px = cx + r * math.cos(angle)
-            py = cy + r * math.sin(angle)
-        else:
-            px = cx + r_inner * math.cos(angle)
-            py = cy + r_inner * math.sin(angle)
-        points.append((px, py))
-    draw.polygon(points, fill=color)
+    # Diagonal linear gradient (#0047AB to #00C4CC)
+    c_img = Image.new('RGBA', (render_size, render_size), (0, 0, 0, 0))
+    for y in range(render_size):
+        for x in range(render_size):
+            t = (x + y) / (2.0 * render_size)
+            r = int(0x00 + (0x00 - 0x00) * t)
+            g = int(0x47 + (0xC4 - 0x47) * t)
+            b = int(0xAB + (0xCC - 0xAB) * t)
+            c_img.putpixel((x, y), (r, g, b, 255))
 
-def generate_icon(size, circle=False):
-    """Generate icon at given size. If circle=True, clip to circle (for adaptive icon foreground)."""
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    
-    # Gradient background
-    bg = make_gradient(size)
-    
-    padding = int(size * 0.06)
-    radius = int(size * 0.22)
-    
+    # Mask circle
+    mask = Image.new('L', (render_size, render_size), 0)
+    m_draw = ImageDraw.Draw(mask)
     if circle:
-        # Circle clip mask
-        mask = Image.new('L', (size, size), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.ellipse([0, 0, size, size], fill=255)
-        img.paste(bg, (0, 0), mask)
+        cx, cy, r = 32 * scale, 32 * scale, 30 * scale
+        m_draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
     else:
-        # Rounded rect mask
-        mask = Image.new('L', (size, size), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        draw_rounded_rect(mask_draw, [padding, padding, size - padding, size - padding], radius, 255)
-        img.paste(bg, (0, 0), mask)
-    
+        # Rounded rect
+        radius = int(render_size * 0.22)
+        padding = int(render_size * 0.04)
+        m_draw.rounded_rectangle([padding, padding, render_size - padding, render_size - padding], radius=radius, fill=255)
+
+    img.paste(c_img, (0, 0), mask)
     draw = ImageDraw.Draw(img)
-    
-    # Draw sparkle in top-right corner
-    sparkle_size = int(size * 0.22)
-    sparkle_x = int(size * 0.72)
-    sparkle_y = int(size * 0.26)
-    draw_sparkle(draw, sparkle_x, sparkle_y, sparkle_size, (255, 255, 255, 120))
-    
-    # Draw "NP" text
-    font_size = int(size * 0.38)
-    font = None
-    # Try to find a bold font
-    font_paths = [
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/calibrib.ttf",
-        "C:/Windows/Fonts/segoeui.ttf",
+
+    # Letter N
+    n_poly = [
+        (18 * scale, 18 * scale),
+        (18 * scale, 46 * scale),
+        (24 * scale, 46 * scale),
+        (24 * scale, 30 * scale),
+        (40 * scale, 46 * scale),
+        (46 * scale, 46 * scale),
+        (46 * scale, 18 * scale),
+        (40 * scale, 18 * scale),
+        (40 * scale, 34 * scale),
+        (24 * scale, 18 * scale),
     ]
-    for fp in font_paths:
-        if os.path.exists(fp):
-            try:
-                font = ImageFont.truetype(fp, font_size)
-                break
-            except:
-                pass
-    
-    if font is None:
-        font = ImageFont.load_default()
-    
-    text = "NP"
-    # Get text bounding box
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    text_x = (size - text_w) // 2 - bbox[0]
-    text_y = (size - text_h) // 2 - bbox[1] + int(size * 0.04)
-    
-    # Shadow
-    draw.text((text_x + int(size*0.02), text_y + int(size*0.02)), text, font=font, fill=(0, 100, 60, 80))
-    # White text
-    draw.text((text_x, text_y), text, font=font, fill=(255, 255, 255, 255))
-    
-    return img
+    draw.polygon(n_poly, fill=(255, 255, 255, 255))
+
+    # 4-point star sparkle
+    def bezier_curve(p0, p1, p2, p3, steps=16):
+        pts = []
+        for i in range(steps + 1):
+            t = i / steps
+            u = 1 - t
+            x = u**3 * p0[0] + 3 * u**2 * t * p1[0] + 3 * u * t**2 * p2[0] + t**3 * p3[0]
+            y = u**3 * p0[1] + 3 * u**2 * t * p1[1] + 3 * u * t**2 * p2[1] + t**3 * p3[1]
+            pts.append((x, y))
+        return pts
+
+    star_pts = []
+    star_pts.extend(bezier_curve((42*scale, 22*scale), (42*scale, 26*scale), (38*scale, 30*scale), (34*scale, 30*scale)))
+    star_pts.extend(bezier_curve((34*scale, 30*scale), (38*scale, 30*scale), (42*scale, 34*scale), (42*scale, 38*scale))[1:])
+    star_pts.extend(bezier_curve((42*scale, 38*scale), (42*scale, 34*scale), (46*scale, 30*scale), (50*scale, 30*scale))[1:])
+    star_pts.extend(bezier_curve((50*scale, 30*scale), (46*scale, 30*scale), (42*scale, 26*scale), (42*scale, 22*scale))[1:])
+
+    draw.polygon(star_pts, fill=(255, 255, 255, 255))
+
+    # Downsample with Lanczos for smooth antialiasing
+    final_img = img.resize((size, size), Image.Resampling.LANCZOS)
+    return final_img
 
 # Android mipmap sizes
 android_sizes = {
@@ -156,19 +118,16 @@ for rel_path, size in android_sizes.items():
     out_path = os.path.join(base_android, rel_path)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     is_round = 'round' in rel_path
-    icon = generate_icon(size, circle=is_round)
-    # Save as RGB PNG (no alpha for Android launcher icons)
-    final = Image.new('RGB', (size, size), (255, 255, 255))
-    final.paste(icon, (0, 0), icon)
-    final.save(out_path, 'PNG', optimize=True)
+    icon = make_logo(size, circle=is_round)
+    icon.save(out_path, 'PNG', optimize=True)
     print(f"  {rel_path} ({size}x{size})")
 
 print("\nGenerating iOS icons...")
 for filename, size in ios_sizes.items():
     out_path = os.path.join(base_ios, filename)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    icon = generate_icon(size, circle=False)
-    # iOS needs no alpha
+    icon = make_logo(size, circle=False)
+    # iOS launcher needs RGB with background
     final = Image.new('RGB', (size, size), (255, 255, 255))
     final.paste(icon, (0, 0), icon)
     final.save(out_path, 'PNG', optimize=True)
@@ -176,7 +135,7 @@ for filename, size in ios_sizes.items():
 
 # Web icons
 web_sizes = {
-    r'C:\erp-nettoyage-mobile\mobile_app\web\favicon.png': 16,
+    r'C:\erp-nettoyage-mobile\mobile_app\web\favicon.png': 64,
     r'C:\erp-nettoyage-mobile\mobile_app\web\icons\Icon-192.png': 192,
     r'C:\erp-nettoyage-mobile\mobile_app\web\icons\Icon-512.png': 512,
     r'C:\erp-nettoyage-mobile\mobile_app\web\icons\Icon-maskable-192.png': 192,
@@ -185,10 +144,8 @@ web_sizes = {
 print("\nGenerating web icons...")
 for out_path, size in web_sizes.items():
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    icon = generate_icon(size, circle=False)
-    final = Image.new('RGB', (size, size), (255, 255, 255))
-    final.paste(icon, (0, 0), icon)
-    final.save(out_path, 'PNG', optimize=True)
+    icon = make_logo(size, circle=True)
+    icon.save(out_path, 'PNG', optimize=True)
     print(f"  {os.path.basename(out_path)} ({size}x{size})")
 
-print("\nDone! All icons generated.")
+print("\nDone! All icons generated from official vector logo.")

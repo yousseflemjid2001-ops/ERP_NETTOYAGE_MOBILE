@@ -753,7 +753,7 @@ class _MissionDetailPageState extends State<MissionDetailPage> {
                       onPressed: _photoUploading ? null : _pickPhotoFromGallery,
                       icon: const Icon(Icons.photo_library, size: 20),
                       label: Text(
-                        'Galerie${_remainingPhotoSlots < _maxPhotos ? ' (${_remainingPhotoSlots})' : ''}',
+                        'Galerie${_remainingPhotoSlots < _maxPhotos ? ' ($_remainingPhotoSlots)' : ''}',
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.deepPurple,

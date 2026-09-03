@@ -138,8 +138,9 @@ class ApiService {
     if (statusCode == 404) return 'Utilisateur introuvable.';
     if (statusCode == 429) return 'Trop de tentatives. Réessayez plus tard.';
     if (statusCode >= 500) return 'Erreur serveur. Réessayez plus tard.';
-    if (message.toLowerCase() == 'unauthorized')
+    if (message.toLowerCase() == 'unauthorized') {
       return 'Email ou mot de passe incorrect.';
+    }
     if (message.toLowerCase() == 'forbidden') return 'Accès refusé.';
     if (message.isNotEmpty) return message;
     return 'Erreur inconnue (code $statusCode).';
@@ -365,7 +366,7 @@ class ApiService {
       'absenceType': absenceType,
       'startDate': startDate,
       'endDate': endDate,
-      if (reason != null) 'reason': reason,
+      'reason': ?reason,
     });
     return Absence.fromJson(data);
   }

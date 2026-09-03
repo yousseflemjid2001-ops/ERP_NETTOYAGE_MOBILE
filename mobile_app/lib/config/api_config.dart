@@ -12,11 +12,17 @@ class ApiConfig {
       return productionUrl;
     }
     if (kIsWeb) {
-      // Debug web → localhost
-      return 'http://localhost:3000/api';
+      // Web → Railway production par défaut
+      return const String.fromEnvironment(
+        'API_URL',
+        defaultValue: productionUrl,
+      );
     } else {
-      // Debug Android → IP locale du serveur
-      return 'http://192.168.1.31:3000/api';
+      // Debug Android → IP locale du serveur ou Railway si spécifié
+      return const String.fromEnvironment(
+        'API_URL',
+        defaultValue: 'http://192.168.1.31:3000/api',
+      );
     }
   }
 

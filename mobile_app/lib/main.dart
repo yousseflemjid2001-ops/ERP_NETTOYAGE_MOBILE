@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:workmanager/workmanager.dart';
@@ -21,6 +22,7 @@ import 'pages/messages/conversations_page.dart';
 import 'services/mission_polling_service.dart';
 import 'services/message_polling_service.dart';
 import 'pages/notifications/notifications_page.dart';
+import 'widgets/app_logo.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,22 +42,24 @@ void main() async {
   // Démarrage de la surveillance de connectivité
   ConnectivityService().startMonitoring();
 
-  // Initialiser WorkManager pour le polling en arrière-plan
-  try {
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
-    // Enregistrer une tâche périodique (minimum 15 min sur Android)
-    await Workmanager().registerPeriodicTask(
-      'notificationPolling',
-      backgroundNotificationTask,
-      frequency: const Duration(minutes: 15),
-      constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-      backoffPolicy: BackoffPolicy.linear,
-      backoffPolicyDelay: const Duration(minutes: 1),
-    );
-    debugPrint('[main] WorkManager background polling registered');
-  } catch (e) {
-    debugPrint('[main] WorkManager init error (ignored): $e');
+  // Initialiser WorkManager pour le polling en arrière-plan (uniquement sur mobile natif)
+  if (!kIsWeb) {
+    try {
+      await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+      // Enregistrer une tâche périodique (minimum 15 min sur Android)
+      await Workmanager().registerPeriodicTask(
+        'notificationPolling',
+        backgroundNotificationTask,
+        frequency: const Duration(minutes: 15),
+        constraints: Constraints(networkType: NetworkType.connected),
+        existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+        backoffPolicy: BackoffPolicy.linear,
+        backoffPolicyDelay: const Duration(minutes: 1),
+      );
+      debugPrint('[main] WorkManager background polling registered');
+    } catch (e) {
+      debugPrint('[main] WorkManager init error (ignored): $e');
+    }
   }
 
   // Sync offline automatique quand la connexion revient
@@ -176,19 +180,7 @@ class _SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.cleaning_services_rounded,
-                color: AppTheme.primaryColor,
-                size: 40,
-              ),
-            ),
+            const AppLogo(size: 88, hasShadow: false),
             const SizedBox(height: 24),
             const Text(
               'Nettoyage Plus',
