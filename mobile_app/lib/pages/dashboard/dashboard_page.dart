@@ -13,7 +13,8 @@ import '../../config/theme.dart';
 import '../notifications/notifications_page.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  final VoidCallback? onShiftChanged;
+  const DashboardPage({super.key, this.onShiftChanged});
 
   @override
   State<DashboardPage> createState() => DashboardPageState();
@@ -24,6 +25,7 @@ class DashboardPageState extends State<DashboardPage>
   final ApiService _api = ApiService();
   final CacheService _cache = CacheService();
   bool _isLoading = true;
+  bool _clockInLoading = false;
   ShiftStatus? _shiftStatus;
   List<Intervention> _todayMissions = [];
   int _pendingMissions = 0;
@@ -297,6 +299,33 @@ class DashboardPageState extends State<DashboardPage>
     if (mounted) setState(() => _isLoading = false);
   }
 
+  Future<void> _activateCheckIn() async {
+    setState(() => _clockInLoading = true);
+    try {
+      await _api.clockIn();
+      await _silentRefreshAll();
+      widget.onShiftChanged?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Check-in activé ! Vos missions sont maintenant affichées.'),
+            backgroundColor: AppTheme.secondaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur Check-in: ${e.toString()}'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() => _clockInLoading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
@@ -486,8 +515,81 @@ class DashboardPageState extends State<DashboardPage>
                     ),
                   ),
 
-                  // Missions List
-                  _todayMissions.isEmpty
+                  // Missions List (visible only after Check-in)
+                  !(_shiftStatus?.isOnShift ?? false)
+                      ? SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppTheme.borderColor),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.fingerprint,
+                                    size: 56,
+                                    color: AppTheme.primaryColor.withOpacity(0.8),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Check-in requis',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Activez votre Check-in (pointage d\'entrée) pour afficher vos missions.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _clockInLoading
+                                          ? null
+                                          : _activateCheckIn,
+                                      icon: _clockInLoading
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.login),
+                                      label: const Text('Activer le Check-in'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppTheme.secondaryColor,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : _todayMissions.isEmpty
                       ? SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.all(32),

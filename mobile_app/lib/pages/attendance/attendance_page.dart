@@ -6,7 +6,13 @@ import '../../models/attendance.dart';
 import '../../config/theme.dart';
 
 class AttendancePage extends StatefulWidget {
-  const AttendancePage({super.key});
+  final VoidCallback? onClockInSuccess;
+  final VoidCallback? onShiftChanged;
+  const AttendancePage({
+    super.key,
+    this.onClockInSuccess,
+    this.onShiftChanged,
+  });
 
   @override
   State<AttendancePage> createState() => AttendancePageState();
@@ -97,6 +103,7 @@ class AttendancePageState extends State<AttendancePage>
     try {
       _shiftStatus = await _api.getShiftStatus();
       _cache.put(CacheService.attendanceShift, _shiftStatus!);
+      _cache.put(CacheService.dashboardShiftStatus, _shiftStatus!);
     } catch (_) {}
 
     try {
@@ -117,10 +124,11 @@ class AttendancePageState extends State<AttendancePage>
     try {
       await _api.clockIn();
       await _loadData();
+      widget.onClockInSuccess?.call();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pointage d\'entrée enregistré !'),
+            content: Text('Check-in activé ! Vos missions sont maintenant affichées.'),
             backgroundColor: AppTheme.secondaryColor,
           ),
         );
@@ -143,6 +151,7 @@ class AttendancePageState extends State<AttendancePage>
     try {
       await _api.clockOut();
       await _loadData();
+      widget.onShiftChanged?.call();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

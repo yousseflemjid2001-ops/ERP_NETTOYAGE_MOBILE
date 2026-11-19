@@ -219,10 +219,29 @@ class _MainNavigationState extends State<MainNavigation> {
   final GlobalKey<AbsencesPageState> _absencesKey = GlobalKey();
   final GlobalKey<ProfilePageState> _profileKey = GlobalKey();
 
+  void _syncShiftAcrossTabs() {
+    _dashboardKey.currentState?.refresh();
+    _missionsKey.currentState?.refresh();
+    _attendanceKey.currentState?.refresh();
+  }
+
   late final List<Widget> _pages = [
-    DashboardPage(key: _dashboardKey),
-    MissionsPage(key: _missionsKey),
-    AttendancePage(key: _attendanceKey),
+    DashboardPage(
+      key: _dashboardKey,
+      onShiftChanged: _syncShiftAcrossTabs,
+    ),
+    MissionsPage(
+      key: _missionsKey,
+      onShiftChanged: _syncShiftAcrossTabs,
+    ),
+    AttendancePage(
+      key: _attendanceKey,
+      onClockInSuccess: () {
+        _syncShiftAcrossTabs();
+        _onTabTap(1);
+      },
+      onShiftChanged: _syncShiftAcrossTabs,
+    ),
     const ConversationsPage(),
     AbsencesPage(key: _absencesKey),
     ProfilePage(key: _profileKey),

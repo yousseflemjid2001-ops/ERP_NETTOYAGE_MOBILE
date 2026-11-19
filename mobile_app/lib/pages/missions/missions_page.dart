@@ -6,10 +6,12 @@ import '../../services/api_service.dart';
 import '../../services/cache_service.dart';
 import '../../services/mission_polling_service.dart';
 import '../../models/intervention.dart';
+import '../../models/attendance.dart';
 import '../../config/theme.dart';
 
 class MissionsPage extends StatefulWidget {
-  const MissionsPage({super.key});
+  final VoidCallback? onShiftChanged;
+  const MissionsPage({super.key, this.onShiftChanged});
 
   @override
   State<MissionsPage> createState() => MissionsPageState();
@@ -21,6 +23,8 @@ class MissionsPageState extends State<MissionsPage>
   final CacheService _cache = CacheService();
   late TabController _tabController;
   bool _isLoading = true;
+  bool _clockInLoading = false;
+  ShiftStatus? _shiftStatus;
   List<Intervention> _missions = [];
   Timer? _autoRefreshTimer;
   StreamSubscription? _missionChangeSub;
@@ -72,6 +76,12 @@ class MissionsPageState extends State<MissionsPage>
 
   /// Restore cached data for the current tab, then refresh from API.
   void _restoreAndRefreshTab() {
+    final cachedShift = _cache.get<ShiftStatus>(
+      CacheService.dashboardShiftStatus,
+    );
+    if (cachedShift != null) {
+      _shiftStatus = cachedShift;
+    }
     final cacheKey = CacheService.missionsKey(_tabController.index);
     final cached = _cache.get<List<Intervention>>(cacheKey);
     if (cached != null) {
@@ -88,6 +98,11 @@ class MissionsPageState extends State<MissionsPage>
   Future<void> _silentRefresh() async {
     final user = context.read<AuthProvider>().user;
     try {
+      try {
+        final shift = await _api.getShiftStatus();
+        _shiftStatus = shift;
+        _cache.put(CacheService.dashboardShiftStatus, shift);
+      } catch (_) {}
       final now = DateTime.now();
       String? dateFrom;
       String? dateTo;
@@ -128,6 +143,11 @@ class MissionsPageState extends State<MissionsPage>
     final user = context.read<AuthProvider>().user;
 
     try {
+      try {
+        _shiftStatus = await _api.getShiftStatus();
+        _cache.put(CacheService.dashboardShiftStatus, _shiftStatus!);
+      } catch (_) {}
+
       final now = DateTime.now();
       String? dateFrom;
       String? dateTo;
@@ -170,6 +190,33 @@ class MissionsPageState extends State<MissionsPage>
     if (mounted) setState(() => _isLoading = false);
   }
 
+  Future<void> _activateCheckIn() async {
+    setState(() => _clockInLoading = true);
+    try {
+      await _api.clockIn();
+      await _loadMissions();
+      widget.onShiftChanged?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Check-in activé ! Vos missions sont maintenant affichées.'),
+            backgroundColor: AppTheme.secondaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur Check-in: ${e.toString()}'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() => _clockInLoading = false);
+  }
+
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
@@ -191,6 +238,77 @@ class MissionsPageState extends State<MissionsPage>
         onRefresh: _loadMissions,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
+            : !(_shiftStatus?.isOnShift ?? false)
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const SizedBox(height: 48),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.borderColor),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.fingerprint,
+                          size: 64,
+                          color: AppTheme.primaryColor.withOpacity(0.8),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Check-in requis',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Activez votre Check-in (pointage d\'entrée) pour accéder et afficher vos missions.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: _clockInLoading
+                                ? null
+                                : _activateCheckIn,
+                            icon: _clockInLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.login),
+                            label: const Text('Activer le Check-in'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.secondaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
             : _missions.isEmpty
             ? Center(
                 child: Column(
